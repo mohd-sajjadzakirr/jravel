@@ -68,22 +68,25 @@
   margin-bottom: 18px;
 }
 .login-social-icon {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: #e0f7fa;
   color: #223a5f;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  border: none;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(71,181,255,0.08);
 }
 .login-social-icon:hover {
   background: #47b5ff;
   color: #fff;
+  box-shadow: 0 4px 16px rgba(71,181,255,0.18);
 }
 .login-form {
   display: flex;
@@ -125,6 +128,36 @@
 }
 .login-submit:hover {
   background: #2563eb;
+}
+
+.login-toggle {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.login-toggle button {
+  background: none;
+  border: none;
+  color: #223a5f;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.login-toggle button.active, .login-toggle button:hover {
+  background: #e0f7fa;
+  color: #47b5ff;
+}
+.login-error {
+  color: #ff715b;
+  background: #fff0f0;
+  border-radius: 8px;
+  padding: 8px 0;
+  margin-top: 8px;
+  font-size: 0.98rem;
+  font-weight: 500;
 }
 
 @media (max-width: 700px) {

@@ -1,7 +1,9 @@
 import React from 'react';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import LoginPage from './LoginPage';
+import MainPage from './MainPage';
+import DashboardPage from './DashboardPage';
 
 function LandingPage() {
   return (
@@ -235,6 +237,8 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/main" element={<MainPage />} />
       </Routes>
     </Router>
   );
