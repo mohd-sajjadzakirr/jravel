@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MainPage.css';
 import { Link } from 'react-router-dom';
+import { auth, db } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const tabs = [
   { label: 'Flights', icon: '✈️' },
@@ -26,6 +28,31 @@ function MainPage() {
   const [trainResults, setTrainResults] = useState([]);
   const [trainLoading, setTrainLoading] = useState(false);
   const [trainError, setTrainError] = useState('');
+
+  // User welcome state
+  const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      setUser(u);
+      if (u) {
+        // Try to get name from Firestore
+        const ref = doc(db, 'users', u.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.firstName || data.lastName) {
+            setUserName(`${data.firstName || ''} ${data.lastName || ''}`.trim());
+            return;
+          }
+        }
+        // Fallback to displayName or email
+        setUserName(u.displayName || u.email || '');
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Fetch hotels from Travel Advisor API
   async function fetchHotels(e) {
@@ -98,6 +125,11 @@ function MainPage() {
   return (
     <div className="main-bg">
       <div className="main-content">
+        {userName && (
+          <div style={{textAlign:'center', marginTop: '32px', marginBottom: '18px'}}>
+            <h2 style={{fontWeight:700, fontSize:'2rem', color:'#223a5f', letterSpacing:'0.5px'}}>Welcome, {userName}!</h2>
+          </div>
+        )}
         <div className="main-tabs">
           {tabs.map((tab, idx) => (
             <button

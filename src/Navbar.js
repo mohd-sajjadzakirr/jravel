@@ -19,12 +19,12 @@ function Navbar() {
   return (
     <nav className="navbar">
       <Link to="/" className="logo">Jravel</Link>
-      <ul className="nav-links">
-        <li>Destinations</li>
-        <li>Hotels</li>
-        <li>Flights</li>
-        <li>Bookings</li>
-      </ul>
+      {user && (
+        <ul className="nav-links">
+          <li><Link to="/main">Book</Link></li>
+          <li><Link to="/itinerary-builder">Plan</Link></li>
+        </ul>
+      )}
       <div className="nav-actions">
         {user ? (
           <>

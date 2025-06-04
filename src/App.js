@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './LoginPage';
@@ -6,10 +6,42 @@ import MainPage from './MainPage';
 import DashboardPage from './DashboardPage';
 import MyDetailsPage from './MyDetailsPage';
 import Navbar from './Navbar';
+import { auth, db } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 function LandingPage() {
+  const [user, setUser] = useState(null);
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      setUser(u);
+      if (u) {
+        // Try to get name from Firestore
+        const ref = doc(db, 'users', u.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.firstName || data.lastName) {
+            setUserName(`${data.firstName || ''} ${data.lastName || ''}`.trim());
+            return;
+          }
+        }
+        setUserName(u.displayName || u.email || '');
+      } else {
+        setUserName('');
+      }
+    });
+    return () => unsub();
+  }, []);
+
   return (
     <>
+      {userName && (
+        <div style={{textAlign:'center', marginTop: '32px', marginBottom: '18px'}}>
+          <h2 style={{fontWeight:700, fontSize:'2rem', color:'#223a5f', letterSpacing:'0.5px'}}>Welcome, {userName}!</h2>
+        </div>
+      )}
       {/* Hero Section */}
       <header className="hero">
         <div className="hero-content">
@@ -223,6 +255,7 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/main" element={<MainPage />} />
         <Route path="/my-details" element={<MyDetailsPage />} />
+        <Route path="/itinerary-builder" element={<div style={{padding:'80px',textAlign:'center'}}><h2>Plan Your Journey</h2><p>This page is under construction.</p></div>} />
       </Routes>
     </Router>
   );
