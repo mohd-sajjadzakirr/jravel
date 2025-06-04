@@ -151,4 +151,114 @@
     flex-direction: column;
     gap: 8px;
   }
+}
+
+.hotel-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.hotel-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(71,181,255,0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 0;
+}
+.hotel-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 32px rgba(71,181,255,0.18);
+}
+.hotel-img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: #e0f7fa;
+}
+.hotel-info {
+  padding: 18px 16px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hotel-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #223a5f;
+  margin-bottom: 2px;
+}
+.hotel-price {
+  color: #47b5ff;
+  font-weight: 600;
+  font-size: 1rem;
+}
+.hotel-rating {
+  color: #888;
+  font-size: 0.98rem;
+}
+.hotel-book-btn {
+  margin-top: 10px;
+  background: linear-gradient(90deg, #4CA1AF 0%, #47b5ff 100%);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(71,181,255,0.10);
+  width: 100%;
+}
+.hotel-book-btn:hover {
+  background: linear-gradient(90deg, #2563eb 0%, #4CA1AF 100%);
+}
+
+.train-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.train-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(71,181,255,0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 18px 16px 16px 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 0;
+}
+.train-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 32px rgba(71,181,255,0.18);
+}
+.train-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #223a5f;
+  margin-bottom: 4px;
+}
+.train-route {
+  color: #47b5ff;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+.train-time {
+  color: #888;
+  font-size: 0.98rem;
+  margin-bottom: 2px;
+}
+.train-platform {
+  color: #495057;
+  font-size: 0.98rem;
 } 

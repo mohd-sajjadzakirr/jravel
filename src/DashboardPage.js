@@ -10,7 +10,7 @@ function DashboardPage() {
   return (
     <div className="dashboard-bg">
       <nav className="navbar dashboard-navbar">
-        <Link to="/" className="logo">TravelPlanner</Link>
+        <Link to="/" className="logo">Jravel</Link>
         <div className="dashboard-profile">
           <span className="dashboard-email">{email}</span>
           <div className="dashboard-avatar">T</div>
@@ -56,7 +56,7 @@ function DashboardPage() {
         </div>
       </div>
       <footer className="dashboard-footer">
-        <span>© 2025 TravelPlanner. All rights reserved.</span>
+        <span>© 2025 Jravel. All rights reserved.</span>
         <div className="dashboard-socials">
           <a href="#" aria-label="Facebook">📘</a>
           <a href="#" aria-label="Instagram">📸</a>

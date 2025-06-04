@@ -1,33 +1,16 @@
 import React from 'react';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './LoginPage';
 import MainPage from './MainPage';
 import DashboardPage from './DashboardPage';
+import MyDetailsPage from './MyDetailsPage';
+import Navbar from './Navbar';
 
 function LandingPage() {
   return (
     <>
-      {/* Navbar */}
-      <nav className="navbar">
-        <Link to="/" className="logo">Jravel</Link>
-        <ul className="nav-links">
-          <li>Destinations</li>
-          <li>Hotels</li>
-          <li>Flights</li>
-          <li>Bookings</li>
-        </ul>
-        <div className="nav-actions">
-          <Link to="/login" className="login-btn">Login</Link>
-          <Link to="/login" className="signup-btn">Sign up</Link>
-          <select className="lang-select">
-            <option>EN</option>
-            <option>FR</option>
-            <option>DE</option>
-          </select>
-        </div>
-      </nav>
-
+      <Navbar />
       {/* Hero Section */}
       <header className="hero">
         <div className="hero-content">
@@ -237,8 +220,9 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/main" element={<MainPage />} />
+        <Route path="/dashboard" element={<><Navbar /><DashboardPage /></>} />
+        <Route path="/main" element={<><Navbar /><MainPage /></>} />
+        <Route path="/my-details" element={<><Navbar /><MyDetailsPage /></>} />
       </Routes>
     </Router>
   );
