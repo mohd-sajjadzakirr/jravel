@@ -59,6 +59,7 @@
   align-items: stretch;
   width: 100%;
   max-width: 900px;
+  margin: 0 auto;
 }
 .dashboard-card {
   background: #fff;

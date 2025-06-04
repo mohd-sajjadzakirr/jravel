@@ -10,7 +10,6 @@ import Navbar from './Navbar';
 function LandingPage() {
   return (
     <>
-      <Navbar />
       {/* Hero Section */}
       <header className="hero">
         <div className="hero-content">
@@ -217,12 +216,13 @@ function LandingPage() {
 function App() {
   return (
     <Router>
+      <Navbar />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/main" element={<><Navbar /><MainPage /></>} />
-        <Route path="/my-details" element={<><Navbar /><MyDetailsPage /></>} />
+        <Route path="/main" element={<MainPage />} />
+        <Route path="/my-details" element={<MyDetailsPage />} />
       </Routes>
     </Router>
   );

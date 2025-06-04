@@ -97,18 +97,6 @@ function MainPage() {
 
   return (
     <div className="main-bg">
-      <nav className="navbar">
-        <Link to="/" className="logo">Jravel</Link>
-        <ul className="nav-links">
-          <li>Destinations</li>
-          <li>Hotels</li>
-          <li>Flights</li>
-          <li>Bookings</li>
-        </ul>
-        <div className="nav-actions">
-          <Link to="/" className="login-btn">Logout</Link>
-        </div>
-      </nav>
       <div className="main-content">
         <div className="main-tabs">
           {tabs.map((tab, idx) => (
