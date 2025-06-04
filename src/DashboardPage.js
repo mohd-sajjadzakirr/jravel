@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './DashboardPage.css';
 import { Link, useNavigate } from 'react-router-dom';
+import { auth } from './firebase';
 
 function DashboardPage() {
-  const username = 'Traveler'; // Replace with context/user data
-  const email = 'sajjadzaki@gmail.com';
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(u => setUser(u));
+    return () => unsub();
+  }, []);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    navigate('/');
+  };
+
+  const username = user?.displayName || 'Traveler';
+  const email = user?.email || 'sajjadzaki@gmail.com';
 
   return (
     <div className="dashboard-bg">
@@ -13,7 +26,11 @@ function DashboardPage() {
         <Link to="/" className="logo">Jravel</Link>
         <div className="dashboard-profile">
           <span className="dashboard-email">{email}</span>
-          <div className="dashboard-avatar">T</div>
+          <div className="dashboard-avatar">{username.charAt(0)}</div>
+          <div className="dashboard-actions">
+            <Link to="/my-details" className="login-btn">My Details</Link>
+            <button className="login-btn" onClick={handleLogout}>Logout</button>
+          </div>
         </div>
       </nav>
       <div className="dashboard-content">

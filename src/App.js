@@ -220,7 +220,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<><Navbar /><DashboardPage /></>} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/main" element={<><Navbar /><MainPage /></>} />
         <Route path="/my-details" element={<><Navbar /><MyDetailsPage /></>} />
       </Routes>
