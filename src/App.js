@@ -245,6 +245,37 @@ function LandingPage() {
   );
 }
 
+function ItineraryBuilderPage() {
+  // Optionally, you can fetch user info here if needed for personalization
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(120deg, #e0f7fa 60%, #fff 100%)', padding: '48px 0' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: '40px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Plan Trip Card */}
+        <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #47b5ff 0%, #2563eb 100%)', borderRadius: 24, boxShadow: '0 4px 24px rgba(71,181,255,0.10)', padding: 36, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 280 }}>
+          <span style={{ fontSize: 48, marginBottom: 18 }}>🗺️</span>
+          <h2 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>Plan Your Trip</h2>
+          <p style={{ marginBottom: 24, textAlign: 'center' }}>Create a custom itinerary, add destinations, and organize your travel schedule step by step.</p>
+          <button style={{ background: '#fff', color: '#2563eb', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(71,181,255,0.10)', transition: 'background 0.2s, color 0.2s' }}>Start Planning</button>
+        </div>
+        {/* AI Suggestions Card */}
+        <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #ff715b 0%, #ff9472 100%)', borderRadius: 24, boxShadow: '0 4px 24px rgba(255,113,91,0.10)', padding: 36, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 280 }}>
+          <span style={{ fontSize: 48, marginBottom: 18 }}>🤖</span>
+          <h2 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>AI Suggestions</h2>
+          <p style={{ marginBottom: 24, textAlign: 'center' }}>Get smart recommendations for destinations, activities, and routes based on your interests and travel history.</p>
+          <button style={{ background: '#fff', color: '#ff715b', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(255,113,91,0.10)', transition: 'background 0.2s, color 0.2s' }}>Get AI Suggestions</button>
+        </div>
+        {/* Personalized Travel Ideas Card */}
+        <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #4CA1AF 0%, #2C3E50 100%)', borderRadius: 24, boxShadow: '0 4px 24px rgba(44,161,175,0.10)', padding: 36, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 280 }}>
+          <span style={{ fontSize: 48, marginBottom: 18 }}>💡</span>
+          <h2 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>Personalized Travel Ideas</h2>
+          <p style={{ marginBottom: 24, textAlign: 'center' }}>Explore unique travel ideas and inspiration tailored just for you, based on your profile and preferences.</p>
+          <button style={{ background: '#fff', color: '#2C3E50', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(44,161,175,0.10)', transition: 'background 0.2s, color 0.2s' }}>Show Ideas</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -255,7 +286,7 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/main" element={<MainPage />} />
         <Route path="/my-details" element={<MyDetailsPage />} />
-        <Route path="/itinerary-builder" element={<div style={{padding:'80px',textAlign:'center'}}><h2>Plan Your Journey</h2><p>This page is under construction.</p></div>} />
+        <Route path="/itinerary-builder" element={<ItineraryBuilderPage />} />
       </Routes>
     </Router>
   );
