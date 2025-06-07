@@ -8,6 +8,8 @@ import MyDetailsPage from './MyDetailsPage';
 import Navbar from './Navbar';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -246,6 +248,7 @@ function LandingPage() {
 }
 
 function ItineraryBuilderPage() {
+  const navigate = useNavigate();
   // Optionally, you can fetch user info here if needed for personalization
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(120deg, #e0f7fa 60%, #fff 100%)', padding: '48px 0' }}>
@@ -255,7 +258,7 @@ function ItineraryBuilderPage() {
           <span style={{ fontSize: 48, marginBottom: 18 }}>🗺️</span>
           <h2 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>Plan Your Trip</h2>
           <p style={{ marginBottom: 24, textAlign: 'center' }}>Create a custom itinerary, add destinations, and organize your travel schedule step by step.</p>
-          <button style={{ background: '#fff', color: '#2563eb', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(71,181,255,0.10)', transition: 'background 0.2s, color 0.2s' }}>Start Planning</button>
+          <button onClick={() => navigate('/trips/new')} style={{ background: '#fff', color: '#2563eb', border: '2px solid #2563eb', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(71,181,255,0.10)', transition: 'background 0.2s, color 0.2s' }}>Start Planning</button>
         </div>
         {/* AI Suggestions Card */}
         <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #ff715b 0%, #ff9472 100%)', borderRadius: 24, boxShadow: '0 4px 24px rgba(255,113,91,0.10)', padding: 36, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 280 }}>
@@ -276,6 +279,61 @@ function ItineraryBuilderPage() {
   );
 }
 
+function TripCreatePage() {
+  const [name, setName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const user = auth.currentUser;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!name || !startDate || !endDate) {
+      setError('Please fill all fields.');
+      return;
+    }
+    if (!user) {
+      setError('You must be logged in.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const tripsRef = collection(db, 'trips');
+      const docRef = await addDoc(tripsRef, {
+        name,
+        startDate,
+        endDate,
+        createdBy: user.uid,
+        members: { [user.uid]: 'admin' },
+        createdAt: serverTimestamp(),
+      });
+      navigate(`/trips/${docRef.id}`);
+    } catch (err) {
+      setError('Error creating trip.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(120deg, #e0f7fa 60%, #fff 100%)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 24, boxShadow: '0 4px 24px rgba(71,181,255,0.10)', padding: 40, minWidth: 340, maxWidth: 400, width: '100%', display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <h2 style={{ textAlign: 'center', color: '#223a5f', fontWeight: 700, marginBottom: 12 }}>Create a New Trip</h2>
+        <label style={{ fontWeight: 600, color: '#2563eb' }}>Trip Name</label>
+        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Summer in Italy" style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
+        <label style={{ fontWeight: 600, color: '#2563eb' }}>Start Date</label>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
+        <label style={{ fontWeight: 600, color: '#2563eb' }}>End Date</label>
+        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
+        {error && <div style={{ color: '#ff715b', textAlign: 'center', marginTop: 8 }}>{error}</div>}
+        <button type="submit" disabled={loading} style={{ background: 'linear-gradient(90deg, #47b5ff 0%, #2563eb 100%)', color: '#fff', border: 'none', borderRadius: 999, padding: '14px 0', fontWeight: 700, fontSize: '1.1rem', marginTop: 18, cursor: 'pointer', boxShadow: '0 2px 8px rgba(71,181,255,0.10)', transition: 'background 0.2s' }}>{loading ? 'Creating...' : 'Create Trip'}</button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -287,6 +345,7 @@ function App() {
         <Route path="/main" element={<MainPage />} />
         <Route path="/my-details" element={<MyDetailsPage />} />
         <Route path="/itinerary-builder" element={<ItineraryBuilderPage />} />
+        <Route path="/trips/new" element={<TripCreatePage />} />
       </Routes>
     </Router>
   );
