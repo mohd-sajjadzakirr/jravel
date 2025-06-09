@@ -18,7 +18,6 @@ import dayjs from 'dayjs';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { deleteDoc } from 'firebase/firestore';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CloseIcon from '@mui/icons-material/Close';
@@ -746,14 +745,6 @@ function TripItineraryPage() {
     try {
       // Generate unique code
       const code = generateInviteCode();
-      // Add to tripInvites collection
-      await addDoc(collection(db, 'tripInvites'), {
-        code,
-        email: inviteEmail,
-        tripId,
-        role: 'contributor',
-        createdAt: new Date()
-      });
       // Add to trip members as before
       const tripRef = doc(db, 'trips', tripId);
       await updateDoc(tripRef, {
@@ -819,7 +810,7 @@ function TripItineraryPage() {
   const handleDeleteActivity = async (activityId) => {
     if (!window.confirm('Delete this activity?')) return;
     try {
-      await deleteDoc(doc(db, 'itineraryItems', activityId));
+      // await deleteDoc(doc(db, 'itineraryItems', activityId));
     } catch (err) {
       alert('Error deleting activity: ' + err.message);
     }
@@ -829,7 +820,7 @@ function TripItineraryPage() {
   const handleDeleteExpense = async (expenseId) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
-      await deleteDoc(doc(db, 'tripExpenses', expenseId));
+      // await deleteDoc(doc(db, 'tripExpenses', expenseId));
     } catch (err) {
       alert('Error deleting expense: ' + err.message);
     }
@@ -1107,7 +1098,8 @@ function TripItineraryPage() {
 }
 
 function MyTripsPage() {
-  const [trips, setTrips] = useState([]);
+  const [createdTrips, setCreatedTrips] = useState([]);
+  const [joinedTrips, setJoinedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [error, setError] = useState('');
@@ -1125,14 +1117,28 @@ function MyTripsPage() {
   useEffect(() => {
     if (!user) return;
     setError('');
+    setLoading(true);
     try {
-      const q = query(collection(db, 'trips'), where('createdBy', '==', user.uid), orderBy('startDate', 'asc'));
-      const unsub = onSnapshot(q, (snap) => {
-        const tripsArr = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTrips(tripsArr);
+      const tripsCol = collection(db, 'trips');
+      // Listen to all trips where the user is a member
+      const unsub = onSnapshot(tripsCol, (snap) => {
+        const allTrips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const emailKey = user.email.replace(/\./g, '_');
+        const created = [];
+        const joined = [];
+        allTrips.forEach(trip => {
+          if (trip.createdBy === user.uid) {
+            created.push(trip);
+          } else if (trip.members && trip.members[emailKey]) {
+            joined.push(trip);
+          }
+        });
+        setCreatedTrips(created);
+        setJoinedTrips(joined);
         setLoading(false);
         console.log('User:', user);
-        console.log('Trips:', tripsArr);
+        console.log('Created Trips:', created);
+        console.log('Joined Trips:', joined);
       }, (err) => {
         setError('Error loading trips: ' + err.message);
         setLoading(false);
@@ -1147,7 +1153,7 @@ function MyTripsPage() {
   const handleDelete = async (tripId) => {
     if (!window.confirm('Are you sure you want to delete this trip? This cannot be undone.')) return;
     try {
-      await deleteDoc(doc(db, 'trips', tripId));
+      // await deleteDoc(doc(db, 'trips', tripId));
     } catch (err) {
       alert('Error deleting trip: ' + err.message);
     }
@@ -1160,15 +1166,32 @@ function MyTripsPage() {
     setJoinSuccess('');
     setJoinLoading(true);
     try {
+      console.log('[JoinTrip] Current user:', user); // Debug log
+      if (!user || !user.email) {
+        setJoinError('Please log in to join a trip.');
+        setJoinLoading(false);
+        return;
+      }
       // Find invite by code
       const q = query(collection(db, 'tripInvites'), where('code', '==', joinCode));
       const snap = await getDocs(q);
       if (snap.empty) {
         setJoinError('Invalid invite code.');
         setJoinLoading(false);
+        console.log('[JoinTrip] No invite found for code:', joinCode);
         return;
       }
       const invite = snap.docs[0].data();
+      const inviteId = snap.docs[0].id;
+      console.log('[JoinTrip] Invite data:', invite); // Debug log
+      console.log('[JoinTrip] Comparing emails:', { userEmail: user.email, inviteEmail: invite.email }); // Debug log
+      // Check if the logged-in user's email matches the invited email
+      if (!invite.email || user.email.toLowerCase() !== invite.email.toLowerCase()) {
+        setJoinError(`This invite code is only valid for ${invite.email}. Please log in with that email.`);
+        setJoinLoading(false);
+        console.log('[JoinTrip] Email mismatch. BLOCKED.');
+        return; // HARD BLOCK
+      }
       const tripId = invite.tripId;
       const role = invite.role || 'contributor';
       // Add user to trip members
@@ -1176,11 +1199,13 @@ function MyTripsPage() {
       await updateDoc(tripRef, {
         [`members.${user.email.replace(/\./g, '_')}`]: { role, email: user.email, joinedViaCode: joinCode }
       });
+      console.log('[JoinTrip] User added.');
       setJoinSuccess('Successfully joined the trip! Redirecting...');
       setTimeout(() => {
         navigate(`/trips/${tripId}`);
       }, 1500);
     } catch (err) {
+      console.error('[JoinTrip] Error:', err); // Debug log
       setJoinError('Error joining trip: ' + err.message);
     } finally {
       setJoinLoading(false);
@@ -1213,11 +1238,13 @@ function MyTripsPage() {
         {joinError && <Typography color="error" sx={{ mt: 1 }}>{joinError}</Typography>}
         {joinSuccess && <Typography color="success.main" sx={{ mt: 1 }}>{joinSuccess}</Typography>}
       </Box>
-      {trips.length === 0 ? (
+      {/* Created Trips Section */}
+      <Typography variant="h6" sx={{ mt: 4, mb: 2, color: '#2563eb' }}>Created by Me</Typography>
+      {createdTrips.length === 0 ? (
         <Typography>No trips found for your account. Make sure your trips have a <b>createdBy</b> field with your user ID.</Typography>
       ) : (
         <List>
-          {trips.map(trip => (
+          {createdTrips.map(trip => (
             <ListItem key={trip.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>{trip.name}</Typography>
@@ -1230,6 +1257,25 @@ function MyTripsPage() {
                     <DeleteIcon />
                   </IconButton>
                 )}
+              </Box>
+            </ListItem>
+          ))}
+        </List>
+      )}
+      {/* Joined Trips Section */}
+      <Typography variant="h6" sx={{ mt: 4, mb: 2, color: '#2563eb' }}>Joined Trips</Typography>
+      {joinedTrips.length === 0 ? (
+        <Typography>No joined trips found. Join a trip using an invite code!</Typography>
+      ) : (
+        <List>
+          {joinedTrips.map(trip => (
+            <ListItem key={trip.id} sx={{ bgcolor: '#f8faff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>{trip.name}</Typography>
+                <Typography sx={{ color: '#888' }}>{dayjs(trip.startDate).format('MMM D, YYYY')} - {dayjs(trip.endDate).format('MMM D, YYYY')}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button variant="contained" sx={{ borderRadius: 999 }} onClick={() => navigate(`/trips/${trip.id}`)}>Open</Button>
               </Box>
             </ListItem>
           ))}
