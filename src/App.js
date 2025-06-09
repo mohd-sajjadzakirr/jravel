@@ -24,6 +24,8 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CloseIcon from '@mui/icons-material/Close';
 import { updateDoc } from 'firebase/firestore';
 import Menu from '@mui/material/Menu';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -406,13 +408,20 @@ function ItineraryBuilderPage() {
   );
 }
 
-function AddActivityModal({ open, onClose, tripId, selectedDay }) {
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState('');
-  const [time, setTime] = useState('');
-  const [notes, setNotes] = useState('');
+function AddActivityModal({ open, onClose, tripId, selectedDay, activity, onSave }) {
+  const [title, setTitle] = useState(activity?.title || '');
+  const [type, setType] = useState(activity?.type || '');
+  const [time, setTime] = useState(activity ? dayjs(activity.date).format('HH:mm') : '');
+  const [notes, setNotes] = useState(activity?.notes || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setTitle(activity?.title || '');
+    setType(activity?.type || '');
+    setTime(activity ? dayjs(activity.date).format('HH:mm') : '');
+    setNotes(activity?.notes || '');
+  }, [activity, open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -421,30 +430,38 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
       setError('Please fill all required fields');
       return;
     }
-
     setLoading(true);
     try {
-      // Combine the selected day's date with the time input
       const activityDate = dayjs(selectedDay).format('YYYY-MM-DD') + 'T' + time;
-      
-      await addDoc(collection(db, 'itineraryItems'), {
-        tripId,
-        title,
-        type,
-        date: activityDate,
-        notes,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-
-      // Reset form and close modal
+      if (activity) {
+        // Edit existing
+        await updateDoc(doc(db, 'itineraryItems', activity.id), {
+          title,
+          type,
+          date: activityDate,
+          notes,
+          updatedAt: new Date()
+        });
+      } else {
+        // Add new
+        await addDoc(collection(db, 'itineraryItems'), {
+          tripId,
+          title,
+          type,
+          date: activityDate,
+          notes,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
       setTitle('');
       setType('');
       setTime('');
       setNotes('');
       onClose();
+      if (onSave) onSave();
     } catch (err) {
-      setError('Error adding activity: ' + err.message);
+      setError('Error saving activity: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -452,7 +469,7 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add New Activity</DialogTitle>
+      <DialogTitle>{activity ? 'Edit Activity' : 'Add New Activity'}</DialogTitle>
       <DialogContent>
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
@@ -462,7 +479,6 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
             required
             fullWidth
           />
-          
           <FormControl fullWidth required>
             <InputLabel>Activity Type</InputLabel>
             <Select
@@ -478,7 +494,6 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
               <MenuItem value="Other">Other</MenuItem>
             </Select>
           </FormControl>
-
           <TextField
             label="Time"
             type="time"
@@ -488,7 +503,6 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
             fullWidth
             InputLabelProps={{ shrink: true }}
           />
-
           <TextField
             label="Notes"
             value={notes}
@@ -497,7 +511,6 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
             rows={3}
             fullWidth
           />
-
           {error && (
             <Typography color="error" sx={{ mt: 1 }}>
               {error}
@@ -512,11 +525,131 @@ function AddActivityModal({ open, onClose, tripId, selectedDay }) {
           variant="contained" 
           disabled={loading}
         >
-          {loading ? 'Adding...' : 'Add Activity'}
+          {loading ? (activity ? 'Saving...' : 'Adding...') : (activity ? 'Save' : 'Add Activity')}
         </Button>
       </DialogActions>
     </Dialog>
   );
+}
+
+function BudgetModal({ open, onClose, tripId, expense, onSave }) {
+  const [amount, setAmount] = useState(expense?.amount || '');
+  const [description, setDescription] = useState(expense?.description || '');
+  const [date, setDate] = useState(expense ? dayjs(expense.date).format('YYYY-MM-DD') : '');
+  const [category, setCategory] = useState(expense?.category || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setAmount(expense?.amount || '');
+    setDescription(expense?.description || '');
+    setDate(expense ? dayjs(expense.date).format('YYYY-MM-DD') : '');
+    setCategory(expense?.category || '');
+  }, [expense, open]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!amount || !description || !date || !category) {
+      setError('Please fill all fields.');
+      return;
+    }
+    setLoading(true);
+    try {
+      if (expense) {
+        await updateDoc(doc(db, 'tripExpenses', expense.id), {
+          amount: parseFloat(amount),
+          description,
+          date,
+          category,
+          updatedAt: new Date()
+        });
+      } else {
+        await addDoc(collection(db, 'tripExpenses'), {
+          tripId,
+          amount: parseFloat(amount),
+          description,
+          date,
+          category,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+      setAmount('');
+      setDescription('');
+      setDate('');
+      setCategory('');
+      onClose();
+      if (onSave) onSave();
+    } catch (err) {
+      setError('Error saving expense: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{expense ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
+      <DialogContent>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Amount"
+            type="number"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            required
+            fullWidth
+            InputProps={{ startAdornment: <AttachMoneyIcon sx={{ mr: 1 }} /> }}
+          />
+          <TextField
+            label="Description"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Date"
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            required
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+          <FormControl fullWidth required>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={category}
+              label="Category"
+              onChange={e => setCategory(e.target.value)}
+            >
+              <MenuItem value="Lodging">Lodging</MenuItem>
+              <MenuItem value="Transport">Transport</MenuItem>
+              <MenuItem value="Food">Food</MenuItem>
+              <MenuItem value="Activity">Activity</MenuItem>
+              <MenuItem value="Shopping">Shopping</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
+            </Select>
+          </FormControl>
+          {error && <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+          {loading ? (expense ? 'Saving...' : 'Adding...') : (expense ? 'Save' : 'Add Expense')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function generateInviteCode() {
+  // Use crypto.randomUUID if available, else fallback
+  if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 }
 
 function TripItineraryPage() {
@@ -534,6 +667,13 @@ function TripItineraryPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [roleMenuAnchor, setRoleMenuAnchor] = useState(null);
   const [roleMenuMember, setRoleMenuMember] = useState(null);
+  const [editActivity, setEditActivity] = useState(null);
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [budgetTabExpenses, setBudgetTabExpenses] = useState([]);
+  const [budgetLoading, setBudgetLoading] = useState(true);
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
+  const [editExpense, setEditExpense] = useState(null);
+  const [inviteSuccessCode, setInviteSuccessCode] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -578,6 +718,18 @@ function TripItineraryPage() {
     return () => unsub();
   }, [tripId]);
 
+  // Fetch expenses for this trip
+  useEffect(() => {
+    if (!tripId) return;
+    setBudgetLoading(true);
+    const q = query(collection(db, 'tripExpenses'), where('tripId', '==', tripId), orderBy('date', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setBudgetTabExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setBudgetLoading(false);
+    });
+    return () => unsub();
+  }, [tripId]);
+
   // Group activities by day
   const activitiesByDay = days.map(day =>
     activities.filter(act => dayjs(act.date).isSame(day, 'day'))
@@ -592,13 +744,28 @@ function TripItineraryPage() {
     }
     setInviteLoading(true);
     try {
-      // Add to members as contributor
+      // Generate unique code
+      const code = generateInviteCode();
+      // Add to tripInvites collection
+      await addDoc(collection(db, 'tripInvites'), {
+        code,
+        email: inviteEmail,
+        tripId,
+        role: 'contributor',
+        createdAt: new Date()
+      });
+      // Add to trip members as before
       const tripRef = doc(db, 'trips', tripId);
       await updateDoc(tripRef, {
-        [`members.${inviteEmail.replace(/\./g, '_')}`]: { role: 'contributor', email: inviteEmail }
+        [`members.${inviteEmail.replace(/\./g, '_')}`]: { role: 'contributor', email: inviteEmail, inviteCode: code }
       });
       setInviteOpen(false);
       setInviteEmail('');
+      setInviteSuccessCode(code);
+      // Copy to clipboard
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code);
+      }
     } catch (err) {
       setInviteError('Error inviting member: ' + err.message);
     } finally {
@@ -647,6 +814,29 @@ function TripItineraryPage() {
       alert('Error removing member: ' + err.message);
     }
   };
+
+  // Delete activity
+  const handleDeleteActivity = async (activityId) => {
+    if (!window.confirm('Delete this activity?')) return;
+    try {
+      await deleteDoc(doc(db, 'itineraryItems', activityId));
+    } catch (err) {
+      alert('Error deleting activity: ' + err.message);
+    }
+  };
+
+  // Delete expense
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm('Delete this expense?')) return;
+    try {
+      await deleteDoc(doc(db, 'tripExpenses', expenseId));
+    } catch (err) {
+      alert('Error deleting expense: ' + err.message);
+    }
+  };
+
+  // Calculate total spent
+  const totalSpent = budgetTabExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
   if (!trip) {
     return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h5">Loading trip...</Typography></Box>;
@@ -737,6 +927,79 @@ function TripItineraryPage() {
               </Button>
             </DialogActions>
           </Dialog>
+          {/* Invite Success Dialog */}
+          <Dialog open={!!inviteSuccessCode} onClose={() => setInviteSuccessCode(null)} maxWidth="xs" fullWidth>
+            <DialogTitle>Invite Code Generated</DialogTitle>
+            <DialogContent>
+              <Typography sx={{ mb: 2 }}>Share this code with the invited member. They can use it to join the trip.</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f5f5f5', borderRadius: 2, p: 2, mb: 2 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 18 }}>{inviteSuccessCode}</Typography>
+                <IconButton size="small" onClick={() => navigator.clipboard.writeText(inviteSuccessCode)}><ContentCopyIcon fontSize="small" /></IconButton>
+              </Box>
+              <Typography sx={{ color: '#2563eb', fontWeight: 500 }}>Code copied to clipboard!</Typography>
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  href={`mailto:?subject=Jravel Trip Invite&body=Join my trip "${trip?.name || ''}" on Jravel! Use this code: ${inviteSuccessCode}`}
+                  target="_blank"
+                >
+                  Share via Email
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="success"
+                  href={`https://wa.me/?text=Join my trip "${trip?.name || ''}" on Jravel! Use this code: ${inviteSuccessCode}`}
+                  target="_blank"
+                >
+                  Share via WhatsApp
+                </Button>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setInviteSuccessCode(null)} variant="contained">Close</Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      ) : tab === 1 ? (
+        <Box sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Budget</Typography>
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setBudgetModalOpen(true)}>
+              Add Expense
+            </Button>
+          </Box>
+          <Typography sx={{ mb: 2, fontWeight: 600 }}>Total Spent: <span style={{ color: '#2563eb' }}>₹{totalSpent.toFixed(2)}</span></Typography>
+          {budgetLoading ? (
+            <Typography>Loading expenses...</Typography>
+          ) : budgetTabExpenses.length === 0 ? (
+            <Typography>No expenses yet. Add your first expense!</Typography>
+          ) : (
+            <List>
+              {budgetTabExpenses.map(exp => (
+                <ListItem key={exp.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography sx={{ fontWeight: 600 }}>₹{exp.amount.toFixed(2)} - {exp.category}</Typography>
+                    <Typography sx={{ color: '#888' }}>{exp.description}</Typography>
+                    <Typography sx={{ color: '#bbb', fontSize: 13 }}>{dayjs(exp.date).format('MMM D, YYYY')}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button size="small" variant="outlined" onClick={() => setEditExpense(exp)} sx={{ textTransform: 'none' }}>Edit</Button>
+                    <IconButton color="error" onClick={() => handleDeleteExpense(exp.id)} title="Delete Expense">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </ListItem>
+              ))}
+            </List>
+          )}
+          <BudgetModal
+            open={budgetModalOpen || !!editExpense}
+            onClose={() => { setBudgetModalOpen(false); setEditExpense(null); }}
+            tripId={tripId}
+            expense={editExpense}
+            onSave={() => setEditExpense(null)}
+          />
         </Box>
       ) : (
         <>
@@ -755,8 +1018,18 @@ function TripItineraryPage() {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Itinerary for {days[selectedDay]?.format('MMM D, YYYY')}</Typography>
               <List>
                 {activitiesByDay[selectedDay]?.length ? activitiesByDay[selectedDay].map(act => (
-                  <ListItem key={act.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1 }}>
+                  <ListItem key={act.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, cursor: 'pointer' }}
+                    onClick={() => setSelectedActivity(act)}
+                    secondaryAction={
+                      <IconButton edge="end" color="error" onClick={e => { e.stopPropagation(); handleDeleteActivity(act.id); }}>
+                        <DeleteIcon />
+                      </IconButton>
+                    }
+                  >
                     <ListItemText primary={dayjs(act.date).format('h:mm A') + ' - ' + act.title} secondary={act.type} />
+                    <IconButton edge="end" color="primary" onClick={e => { e.stopPropagation(); setEditActivity(act); }}>
+                      <EditIcon />
+                    </IconButton>
                   </ListItem>
                 )) : <Typography sx={{ color: '#888', mt: 2 }}>No activities for this day.</Typography>}
               </List>
@@ -769,7 +1042,7 @@ function TripItineraryPage() {
                 Add Activity
               </Button>
             </Box>
-            {/* Collapsible Sidebar */}
+            {/* Sidebar for activity details */}
             <Drawer
               variant="persistent"
               anchor="right"
@@ -792,9 +1065,23 @@ function TripItineraryPage() {
                 <IconButton onClick={() => setSidebarOpen(false)} size="small"><ChevronRightIcon /></IconButton>
               </Toolbar>
               <Box sx={{ p: 3, display: sidebarOpen ? 'block' : 'none' }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Activity Details</Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Typography variant="body1" color="text.secondary">Select an activity to view or edit details here.</Typography>
+                {selectedActivity ? (
+                  <>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{selectedActivity.title}</Typography>
+                    <Typography sx={{ color: '#2563eb', fontWeight: 600, mb: 1 }}>{selectedActivity.type}</Typography>
+                    <Typography sx={{ color: '#888', mb: 1 }}>{dayjs(selectedActivity.date).format('MMM D, YYYY, h:mm A')}</Typography>
+                    {selectedActivity.notes && <Typography sx={{ mb: 2 }}>{selectedActivity.notes}</Typography>}
+                    <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditActivity(selectedActivity)} sx={{ borderRadius: 999, mt: 2 }}>
+                      Edit Activity
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Activity Details</Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Typography variant="body1" color="text.secondary">Select an activity to view or edit details here.</Typography>
+                  </>
+                )}
               </Box>
             </Drawer>
             {/* Sidebar open button (when collapsed) */}
@@ -807,11 +1094,13 @@ function TripItineraryPage() {
         </>
       )}
 
-      <AddActivityModal 
-        open={isAddActivityModalOpen}
-        onClose={() => setIsAddActivityModalOpen(false)}
+      <AddActivityModal
+        open={isAddActivityModalOpen || !!editActivity}
+        onClose={() => { setIsAddActivityModalOpen(false); setEditActivity(null); }}
         tripId={tripId}
         selectedDay={days[selectedDay]}
+        activity={editActivity}
+        onSave={() => setEditActivity(null)}
       />
     </Box>
   );
