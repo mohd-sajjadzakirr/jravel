@@ -673,6 +673,9 @@ function TripItineraryPage() {
   const [budgetModalOpen, setBudgetModalOpen] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [inviteSuccessCode, setInviteSuccessCode] = useState(null);
+  const [inviteTab, setInviteTab] = useState(0); // 0: Email, 1: Code
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -748,7 +751,7 @@ function TripItineraryPage() {
       // Add to trip members as before
       const tripRef = doc(db, 'trips', tripId);
       await updateDoc(tripRef, {
-        [`members.${inviteEmail.replace(/\./g, '_')}`]: { role: 'contributor', email: inviteEmail, inviteCode: code }
+        [`members.${inviteEmail.replace(/\./g, '_').toLowerCase()}`]: { role: 'contributor', email: inviteEmail, inviteCode: code }
       });
       setInviteOpen(false);
       setInviteEmail('');
@@ -829,6 +832,29 @@ function TripItineraryPage() {
   // Calculate total spent
   const totalSpent = budgetTabExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
+  // Generate and store a one-time code in Firestore
+  const handleGenerateCode = async () => {
+    setInviteError('');
+    setCodeLoading(true);
+    try {
+      const code = generateInviteCode();
+      await addDoc(collection(db, 'tripInvites'), {
+        code,
+        tripId,
+        email: null, // open code
+        used: false,
+        createdAt: new Date(),
+      });
+      setGeneratedCode(code);
+      setInviteSuccessCode(code);
+      if (navigator.clipboard) navigator.clipboard.writeText(code);
+    } catch (err) {
+      setInviteError('Error generating code: ' + err.message);
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
   if (!trip) {
     return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h5">Loading trip...</Typography></Box>;
   }
@@ -901,21 +927,49 @@ function TripItineraryPage() {
             <DialogTitle>Invite Member</DialogTitle>
             <IconButton onClick={() => setInviteOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
             <DialogContent>
-              <TextField
-                label="Email"
-                value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
-                fullWidth
-                required
-                sx={{ mt: 2 }}
-              />
-              {inviteError && <Typography color="error" sx={{ mt: 1 }}>{inviteError}</Typography>}
+              <Tabs value={inviteTab} onChange={(_, v) => setInviteTab(v)} sx={{ mb: 2 }}>
+                <Tab label="By Email" />
+                <Tab label="One-Time Code" />
+              </Tabs>
+              {inviteTab === 0 ? (
+                <>
+                  <TextField
+                    label="Email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    fullWidth
+                    required
+                    sx={{ mt: 2 }}
+                  />
+                  {inviteError && <Typography color="error" sx={{ mt: 1 }}>{inviteError}</Typography>}
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="contained"
+                    onClick={handleGenerateCode}
+                    disabled={codeLoading}
+                    sx={{ borderRadius: 999, mt: 2 }}
+                  >
+                    {codeLoading ? 'Generating...' : 'Generate One-Time Code'}
+                  </Button>
+                  {generatedCode && (
+                    <Box sx={{ mt: 3, bgcolor: '#f5f5f5', borderRadius: 2, p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: 18 }}>{generatedCode}</Typography>
+                      <IconButton size="small" onClick={() => navigator.clipboard.writeText(generatedCode)}><ContentCopyIcon fontSize="small" /></IconButton>
+                    </Box>
+                  )}
+                  {inviteError && <Typography color="error" sx={{ mt: 1 }}>{inviteError}</Typography>}
+                </>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setInviteOpen(false)}>Cancel</Button>
-              <Button onClick={handleInvite} variant="contained" disabled={inviteLoading}>
-                {inviteLoading ? 'Inviting...' : 'Invite'}
-              </Button>
+              {inviteTab === 0 && (
+                <Button onClick={handleInvite} variant="contained" disabled={inviteLoading}>
+                  {inviteLoading ? 'Inviting...' : 'Invite'}
+                </Button>
+              )}
             </DialogActions>
           </Dialog>
           {/* Invite Success Dialog */}
@@ -1123,14 +1177,18 @@ function MyTripsPage() {
       // Listen to all trips where the user is a member
       const unsub = onSnapshot(tripsCol, (snap) => {
         const allTrips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const emailKey = user.email.replace(/\./g, '_');
+        const emailKey = user.email.replace(/\./g, '_').toLowerCase();
         const created = [];
         const joined = [];
         allTrips.forEach(trip => {
           if (trip.createdBy === user.uid) {
             created.push(trip);
-          } else if (trip.members && trip.members[emailKey]) {
-            joined.push(trip);
+          } else if (trip.members) {
+            // Normalize all keys to lowercase for comparison
+            const memberKeys = Object.keys(trip.members).map(k => k.toLowerCase());
+            if (memberKeys.includes(emailKey)) {
+              joined.push(trip);
+            }
           }
         });
         setCreatedTrips(created);
@@ -1166,7 +1224,6 @@ function MyTripsPage() {
     setJoinSuccess('');
     setJoinLoading(true);
     try {
-      console.log('[JoinTrip] Current user:', user); // Debug log
       if (!user || !user.email) {
         setJoinError('Please log in to join a trip.');
         setJoinLoading(false);
@@ -1178,34 +1235,28 @@ function MyTripsPage() {
       if (snap.empty) {
         setJoinError('Invalid invite code.');
         setJoinLoading(false);
-        console.log('[JoinTrip] No invite found for code:', joinCode);
         return;
       }
-      const invite = snap.docs[0].data();
-      const inviteId = snap.docs[0].id;
-      console.log('[JoinTrip] Invite data:', invite); // Debug log
-      console.log('[JoinTrip] Comparing emails:', { userEmail: user.email, inviteEmail: invite.email }); // Debug log
-      // Check if the logged-in user's email matches the invited email
-      if (!invite.email || user.email.toLowerCase() !== invite.email.toLowerCase()) {
-        setJoinError(`This invite code is only valid for ${invite.email}. Please log in with that email.`);
+      const inviteDoc = snap.docs[0];
+      const invite = inviteDoc.data();
+      if (invite.used) {
+        setJoinError('This invite code has already been used.');
         setJoinLoading(false);
-        console.log('[JoinTrip] Email mismatch. BLOCKED.');
-        return; // HARD BLOCK
+        return;
       }
       const tripId = invite.tripId;
-      const role = invite.role || 'contributor';
       // Add user to trip members
       const tripRef = doc(db, 'trips', tripId);
       await updateDoc(tripRef, {
-        [`members.${user.email.replace(/\./g, '_')}`]: { role, email: user.email, joinedViaCode: joinCode }
+        [`members.${user.email.replace(/\./g, '_').toLowerCase()}`]: { role: 'contributor', email: user.email, joinedViaCode: joinCode }
       });
-      console.log('[JoinTrip] User added.');
+      // Mark invite as used
+      await updateDoc(inviteDoc.ref, { used: true, usedBy: user.email, usedAt: new Date() });
       setJoinSuccess('Successfully joined the trip! Redirecting...');
       setTimeout(() => {
         navigate(`/trips/${tripId}`);
       }, 1500);
     } catch (err) {
-      console.error('[JoinTrip] Error:', err); // Debug log
       setJoinError('Error joining trip: ' + err.message);
     } finally {
       setJoinLoading(false);
