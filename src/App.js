@@ -7,7 +7,7 @@ import DashboardPage from './DashboardPage';
 import MyDetailsPage from './MyDetailsPage';
 import Navbar from './Navbar';
 import { auth, db } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select } from '@mui/material';
@@ -1112,6 +1112,10 @@ function MyTripsPage() {
   const [user, setUser] = useState(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [joinCode, setJoinCode] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [joinSuccess, setJoinSuccess] = useState('');
 
   useEffect(() => {
     const unsubAuth = auth.onAuthStateChanged(u => setUser(u));
@@ -1149,6 +1153,40 @@ function MyTripsPage() {
     }
   };
 
+  // Join trip by code
+  const handleJoinTrip = async (e) => {
+    e.preventDefault();
+    setJoinError('');
+    setJoinSuccess('');
+    setJoinLoading(true);
+    try {
+      // Find invite by code
+      const q = query(collection(db, 'tripInvites'), where('code', '==', joinCode));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setJoinError('Invalid invite code.');
+        setJoinLoading(false);
+        return;
+      }
+      const invite = snap.docs[0].data();
+      const tripId = invite.tripId;
+      const role = invite.role || 'contributor';
+      // Add user to trip members
+      const tripRef = doc(db, 'trips', tripId);
+      await updateDoc(tripRef, {
+        [`members.${user.email.replace(/\./g, '_')}`]: { role, email: user.email, joinedViaCode: joinCode }
+      });
+      setJoinSuccess('Successfully joined the trip! Redirecting...');
+      setTimeout(() => {
+        navigate(`/trips/${tripId}`);
+      }, 1500);
+    } catch (err) {
+      setJoinError('Error joining trip: ' + err.message);
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
   if (!user) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h6">Please log in to view your trips.</Typography></Box>;
   if (loading) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography>Loading trips...</Typography></Box>;
   if (error) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography color="error">{error}</Typography></Box>;
@@ -1156,6 +1194,25 @@ function MyTripsPage() {
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', mt: 6, p: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 4, color: '#2563eb' }}>My Trips</Typography>
+      {/* Join Trip Section */}
+      <Box sx={{ mb: 4, p: 3, bgcolor: '#f5faff', borderRadius: 3, boxShadow: 1 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Join a Trip with Invite Code</Typography>
+        <form onSubmit={handleJoinTrip} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField
+            label="Invite Code"
+            value={joinCode}
+            onChange={e => setJoinCode(e.target.value)}
+            required
+            sx={{ minWidth: 220 }}
+            size="small"
+          />
+          <Button type="submit" variant="contained" disabled={joinLoading} sx={{ borderRadius: 999 }}>
+            {joinLoading ? 'Joining...' : 'Join Trip'}
+          </Button>
+        </form>
+        {joinError && <Typography color="error" sx={{ mt: 1 }}>{joinError}</Typography>}
+        {joinSuccess && <Typography color="success.main" sx={{ mt: 1 }}>{joinSuccess}</Typography>}
+      </Box>
       {trips.length === 0 ? (
         <Typography>No trips found for your account. Make sure your trips have a <b>createdBy</b> field with your user ID.</Typography>
       ) : (
