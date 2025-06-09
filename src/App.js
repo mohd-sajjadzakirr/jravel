@@ -7,7 +7,7 @@ import DashboardPage from './DashboardPage';
 import MyDetailsPage from './MyDetailsPage';
 import Navbar from './Navbar';
 import { auth, db } from './firebase';
-import { doc, getDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select } from '@mui/material';
@@ -810,7 +810,7 @@ function TripItineraryPage() {
   const handleDeleteActivity = async (activityId) => {
     if (!window.confirm('Delete this activity?')) return;
     try {
-      // await deleteDoc(doc(db, 'itineraryItems', activityId));
+      await deleteDoc(doc(db, 'itineraryItems', activityId));
     } catch (err) {
       alert('Error deleting activity: ' + err.message);
     }
@@ -820,7 +820,7 @@ function TripItineraryPage() {
   const handleDeleteExpense = async (expenseId) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
-      // await deleteDoc(doc(db, 'tripExpenses', expenseId));
+      await deleteDoc(doc(db, 'tripExpenses', expenseId));
     } catch (err) {
       alert('Error deleting expense: ' + err.message);
     }
@@ -1153,7 +1153,7 @@ function MyTripsPage() {
   const handleDelete = async (tripId) => {
     if (!window.confirm('Are you sure you want to delete this trip? This cannot be undone.')) return;
     try {
-      // await deleteDoc(doc(db, 'trips', tripId));
+      await deleteDoc(doc(db, 'trips', tripId));
     } catch (err) {
       alert('Error deleting trip: ' + err.message);
     }
