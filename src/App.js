@@ -22,6 +22,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CloseIcon from '@mui/icons-material/Close';
 import { updateDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
 import Menu from '@mui/material/Menu';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -1187,95 +1188,54 @@ function TripItineraryPage() {
       ) : (
         <>
           {/* Day Navigation */}
-          <Box sx={{ display: 'flex', gap: 2, py: 2, overflowX: 'auto', background: 'rgba(255,255,255,0.95)' }}>
+          <Box sx={{ width: '100%', bgcolor: '#f7f9fb', borderBottom: '1.5px solid #e6eaf0', px: 3, py: 2, display: 'flex', gap: 2 }}>
             {days.map((day, i) => (
-              <Button key={i} variant={i === selectedDay ? 'contained' : 'outlined'} sx={{ borderRadius: 999, minWidth: 100, fontWeight: 700 }} onClick={() => setSelectedDay(i)}>
-                Day {i + 1}<br />{day.format('MMM D')}
+              <Button
+                key={i}
+                variant={i === selectedDay ? 'contained' : 'outlined'}
+                sx={{ borderRadius: 999, minWidth: 100, fontWeight: 700 }}
+                onClick={() => setSelectedDay(i)}
+              >
+                {`Day ${i + 1}`}<br />{day.format('MMM D')}
               </Button>
             ))}
           </Box>
           {/* Main Content */}
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start', gap: 4, px: 4, py: 3 }}>
-            {/* Main Content (Itinerary, etc.) */}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              {/* Timeline/Activities */}
-              <Box sx={{ transition: 'margin-right 0.3s', marginRight: 0 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Itinerary for {days[selectedDay]?.format('MMM D, YYYY')}</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 0, width: '100%' }}>
+            {/* Left Sidebar Navigation */}
+            <Box sx={{ width: 220, minWidth: 180, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', height: '100vh', position: 'sticky', top: 0, display: { xs: 'none', sm: 'block' } }}>
+              <Box sx={{ p: 3, pt: 4 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: '#223a5f' }}>Menu</Typography>
                 <List>
-                  {activitiesByDay[selectedDay]?.length ? activitiesByDay[selectedDay].map(act => (
-                    <ListItem key={act.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, cursor: 'pointer' }}
-                      onClick={() => setSelectedActivity(act)}
-                      secondaryAction={
-                        <IconButton edge="end" color="error" onClick={e => { e.stopPropagation(); handleDeleteActivity(act.id); }}>
-                          <DeleteIcon />
-                        </IconButton>
-                      }
-                    >
-                      <ListItemText primary={dayjs(act.date).format('h:mm A') + ' - ' + act.title} secondary={act.type} />
-                      <IconButton edge="end" color="primary" onClick={e => { e.stopPropagation(); setEditActivity(act); }}>
-                        <EditIcon />
-                      </IconButton>
-                    </ListItem>
-                  )) : <Typography sx={{ color: '#888', mt: 2 }}>No activities for this day.</Typography>}
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                    <ListItemText primary="Overview" />
+                  </ListItem>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                    <ListItemText primary="Explore" />
+                  </ListItem>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                    <ListItemText primary="Notes" />
+                  </ListItem>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                    <ListItemText primary="Places to visit" />
+                  </ListItem>
+                  <ListItem button selected sx={{ borderRadius: 2, mb: 1, bgcolor: '#eaf6fb', fontWeight: 700 }}>
+                    <ListItemText primary={`Itinerary for ${days[selectedDay]?.format('dddd, MMMM D') || ''}`} />
+                  </ListItem>
                 </List>
-                <Button 
-                  variant="outlined" 
-                  startIcon={<AddIcon />} 
-                  sx={{ borderRadius: 999, mt: 2 }}
-                  onClick={() => setIsAddActivityModalOpen(true)}
-                >
-                  Add Activity
-                </Button>
               </Box>
-              {/* Activity Details Drawer (unchanged) */}
-              <Drawer
-                variant="persistent"
-                anchor="right"
-                open={sidebarOpen}
-                sx={{
-                  width: sidebarOpen ? 340 : 0,
-                  flexShrink: 0,
-                  [`& .MuiDrawer-paper`]: {
-                    width: 340,
-                    boxSizing: 'border-box',
-                    borderLeft: '1px solid #e0e0e0',
-                    background: '#f8fafd',
-                    transition: 'width 0.3s',
-                    overflowX: 'hidden',
-                    ...(sidebarOpen ? {} : { width: 0, minWidth: 0, padding: 0, border: 'none' })
-                  },
-                }}
-              >
-                <Toolbar sx={{ minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1 }}>
-                  <IconButton onClick={() => setSidebarOpen(false)} size="small"><ChevronRightIcon /></IconButton>
-                </Toolbar>
-                <Box sx={{ p: 3, display: sidebarOpen ? 'block' : 'none' }}>
-                  {selectedActivity ? (
-                    <>
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{selectedActivity.title}</Typography>
-                      <Typography sx={{ color: '#2563eb', fontWeight: 600, mb: 1 }}>{selectedActivity.type}</Typography>
-                      <Typography sx={{ color: '#888', mb: 1 }}>{dayjs(selectedActivity.date).format('MMM D, YYYY, h:mm A')}</Typography>
-                      {selectedActivity.notes && <Typography sx={{ mb: 2 }}>{selectedActivity.notes}</Typography>}
-                      <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditActivity(selectedActivity)} sx={{ borderRadius: 999, mt: 2 }}>
-                        Edit Activity
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Activity Details</Typography>
-                      <Divider sx={{ mb: 2 }} />
-                      <Typography variant="body1" color="text.secondary">Select an activity to view or edit details here.</Typography>
-                    </>
-                  )}
-                </Box>
-              </Drawer>
-              {!sidebarOpen && (
-                <IconButton onClick={() => setSidebarOpen(true)} sx={{ position: 'fixed', right: 8, top: 120, zIndex: 1201, bgcolor: '#fff', border: '1px solid #e0e0e0', boxShadow: 1 }}>
-                  <ChevronLeftIcon />
-                </IconButton>
+            </Box>
+            {/* Center: Itinerary Days as Cards */}
+            <Box sx={{ flex: 1, px: { xs: 1, sm: 3 }, py: 3, maxWidth: 700, mx: 'auto' }}>
+              {days[selectedDay] && (
+                <DayPlanCard
+                  tripId={tripId}
+                  day={days[selectedDay]}
+                  userId={auth.currentUser?.uid}
+                />
               )}
             </Box>
-            {/* Sidebar Map */}
+            {/* Right Sidebar: Map (already present) */}
             {trip && trip.place && trip.place.lat && trip.place.lon && (
               <Paper sx={{ minWidth: 340, maxWidth: 400, minHeight: 340, borderRadius: 4, boxShadow: 3, p: 2, position: { md: 'sticky' }, top: 100, display: { xs: 'none', md: 'block' } }}>
                 <Typography variant="h6" sx={{ color: '#2563eb', mb: 1 }}>Trip Location</Typography>
@@ -1831,6 +1791,209 @@ const TripDetailsPage = () => {
     </Container>
   );
 };
+
+// Add the DayPlanCard component after TripItineraryPage
+function DayPlanCard({ tripId, day, userId }) {
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [activityForm, setActivityForm] = useState({ name: '', time: '', type: '', notes: '', id: '' });
+  const [editIdx, setEditIdx] = useState(null);
+  const dayId = day.format('YYYY-MM-DD');
+
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    const unsub = onSnapshot(
+      doc(collection(db, 'trips', tripId, 'days'), dayId),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setTitle(data.title || '');
+          setNotes(data.notes || '');
+          setActivities(data.activities || []);
+        } else {
+          setTitle('');
+          setNotes('');
+          setActivities([]);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        setError('Error loading day: ' + err.message);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, [tripId, dayId]);
+
+  const handleActivityChange = (field, value) => {
+    setActivityForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddOrEditActivity = (e) => {
+    e.preventDefault();
+    if (!activityForm.name) return;
+    if (editIdx !== null) {
+      // Edit
+      const updated = [...activities];
+      updated[editIdx] = { ...activityForm };
+      setActivities(updated);
+      setEditIdx(null);
+    } else {
+      setActivities((prev) => [
+        ...prev,
+        { ...activityForm, id: Date.now().toString() },
+      ]);
+    }
+    setActivityForm({ name: '', time: '', type: '', notes: '', id: '' });
+  };
+
+  const handleEdit = (idx) => {
+    setEditIdx(idx);
+    setActivityForm(activities[idx]);
+  };
+
+  const handleDelete = (idx) => {
+    setActivities((prev) => prev.filter((_, i) => i !== idx));
+    if (editIdx === idx) {
+      setEditIdx(null);
+      setActivityForm({ name: '', time: '', type: '', notes: '', id: '' });
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await updateDoc(doc(collection(db, 'trips', tripId, 'days'), dayId), {
+        title,
+        notes,
+        activities,
+        userId,
+        updatedAt: new Date(),
+      }).catch(async (err) => {
+        // If doc doesn't exist, create it
+        if (err.code === 'not-found') {
+          await setDoc(doc(collection(db, 'trips', tripId, 'days'), dayId), {
+            title,
+            notes,
+            activities,
+            userId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        } else {
+          throw err;
+        }
+      });
+    } catch (err) {
+      setError('Error saving: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Paper sx={{ p: 3, borderRadius: 4, minHeight: 200 }}>Loading...</Paper>;
+
+  return (
+    <Paper sx={{ mb: 3, borderRadius: 4, boxShadow: 2, p: 3, bgcolor: '#fff' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>{day.format('dddd, MMMM D')}</Typography>
+      </Box>
+      <TextField
+        variant="standard"
+        placeholder="Add title"
+        fullWidth
+        sx={{ mb: 1, fontWeight: 600 }}
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+      />
+      <TextField
+        variant="outlined"
+        placeholder="Write or paste notes here"
+        fullWidth
+        multiline
+        minRows={2}
+        sx={{ mb: 2 }}
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+      />
+      {/* Activities List */}
+      <List>
+        {activities.length ? activities.map((act, idx) => (
+          <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <ListItemText
+              primary={act.name + (act.time ? ` (${act.time})` : '')}
+              secondary={act.type ? `${act.type}${act.notes ? ' - ' + act.notes : ''}` : act.notes}
+            />
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton edge="end" color="primary" onClick={() => handleEdit(idx)}><EditIcon /></IconButton>
+              <IconButton edge="end" color="error" onClick={() => handleDelete(idx)}><DeleteIcon /></IconButton>
+            </Box>
+          </ListItem>
+        )) : <Typography sx={{ color: '#bbb', fontSize: 15, mt: 1 }}>No items for this day.</Typography>}
+      </List>
+      {/* Add/Edit Activity Form */}
+      <Box component="form" onSubmit={handleAddOrEditActivity} sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TextField
+          placeholder="Name"
+          value={activityForm.name}
+          onChange={e => handleActivityChange('name', e.target.value)}
+          required
+          size="small"
+          sx={{ minWidth: 120 }}
+        />
+        <TextField
+          placeholder="Time"
+          type="time"
+          value={activityForm.time}
+          onChange={e => handleActivityChange('time', e.target.value)}
+          size="small"
+          sx={{ minWidth: 100 }}
+          InputLabelProps={{ shrink: true }}
+        />
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Type</InputLabel>
+          <Select
+            value={activityForm.type}
+            label="Type"
+            onChange={e => handleActivityChange('type', e.target.value)}
+          >
+            <MenuItem value="Sightseeing">Sightseeing</MenuItem>
+            <MenuItem value="Food">Food</MenuItem>
+            <MenuItem value="Hotel">Hotel</MenuItem>
+            <MenuItem value="Transport">Transport</MenuItem>
+            <MenuItem value="Other">Other</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          placeholder="Notes"
+          value={activityForm.notes}
+          onChange={e => handleActivityChange('notes', e.target.value)}
+          size="small"
+          sx={{ minWidth: 140 }}
+        />
+        <Button type="submit" variant="contained" sx={{ borderRadius: 999, fontWeight: 700, px: 3 }}>
+          {editIdx !== null ? 'Update' : 'Add'}
+        </Button>
+      </Box>
+      <Button
+        variant="contained"
+        color="primary"
+        sx={{ borderRadius: 999, mt: 3, fontWeight: 700, px: 4, py: 1.2, fontSize: 16 }}
+        onClick={handleSave}
+        disabled={saving}
+      >
+        {saving ? 'Saving...' : 'Save Day Plan'}
+      </Button>
+      {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
+    </Paper>
+  );
+}
 
 function App() {
   return (
