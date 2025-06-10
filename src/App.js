@@ -10,7 +10,7 @@ import { auth, db } from './firebase';
 import { doc, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, Container, Paper, Grid } from '@mui/material';
+import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, Container, Paper, Grid, Card } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import { onSnapshot, query, where, orderBy } from 'firebase/firestore';
@@ -27,6 +27,12 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useAuth } from './contexts/AuthContext';
 import { AuthProvider } from './contexts/AuthContext';
+import SendIcon from '@mui/icons-material/Send';
+import PeopleIcon from '@mui/icons-material/People';
+import PublicIcon from '@mui/icons-material/Public';
+import LockIcon from '@mui/icons-material/Lock';
+import Autocomplete from '@mui/material/Autocomplete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -265,26 +271,80 @@ function LandingPage() {
 }
 
 function TripCreateModal({ open, onClose, onCreated }) {
-  const [name, setName] = useState('');
+  const [destination, setDestination] = useState('');
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [placeOptions, setPlaceOptions] = useState([]);
+  const [placeLoading, setPlaceLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [privacy, setPrivacy] = useState('friends');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [inviteSent, setInviteSent] = useState(false);
   const navigate = useNavigate();
+  const [unsplashLoading, setUnsplashLoading] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return () => unsub();
   }, []);
 
+  // Fetch place suggestions
+  useEffect(() => {
+    if (!destination || destination.length < 2) {
+      setPlaceOptions([]);
+      return;
+    }
+    setPlaceLoading(true);
+    const controller = new AbortController();
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destination)}&addressdetails=1&limit=6`, {
+      signal: controller.signal,
+      headers: { 'Accept-Language': 'en' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setPlaceOptions(data);
+        setPlaceLoading(false);
+      })
+      .catch(() => setPlaceLoading(false));
+    return () => controller.abort();
+  }, [destination]);
+
+  const fetchPlacePhoto = async (placeName, placeObj) => {
+    // Try to use city, state, country for more unique images
+    let query = '';
+    if (placeObj && placeObj.address) {
+      if (placeObj.address.city) query = placeObj.address.city;
+      else if (placeObj.address.town) query = placeObj.address.town;
+      else if (placeObj.address.village) query = placeObj.address.village;
+      else if (placeObj.address.state) query = placeObj.address.state;
+      else if (placeObj.address.country) query = placeObj.address.country;
+      if (placeObj.address.state && placeObj.address.country) query += ', ' + placeObj.address.state + ', ' + placeObj.address.country;
+      else if (placeObj.address.country) query += ', ' + placeObj.address.country;
+    }
+    if (!query) query = placeName;
+    const UNSPLASH_ACCESS_KEY = '';
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${UNSPLASH_ACCESS_KEY}&orientation=landscape&per_page=1`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        return data.results[0].urls.regular;
+      }
+    } catch (e) {}
+    // fallback: Wikimedia or a static image
+    return `https://source.unsplash.com/600x400/?${encodeURIComponent(query)}`;
+  };
+
   if (!open) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!name || !startDate || !endDate) {
-      setError('Please fill all fields.');
+    if (!selectedPlace) {
+      setError('Choose a destination to start planning');
       return;
     }
     if (!user) {
@@ -292,43 +352,116 @@ function TripCreateModal({ open, onClose, onCreated }) {
       return;
     }
     setLoading(true);
+    setUnsplashLoading(true);
     try {
+      // Fetch a famous photo for the place
+      const photoUrl = await fetchPlacePhoto(selectedPlace.display_name.split(',')[0], selectedPlace);
+      setUnsplashLoading(false);
       const docRef = await addDoc(collection(db, 'trips'), {
-        name,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
+        name: selectedPlace.display_name,
+        place: selectedPlace,
+        photoUrl,
+        startDate: startDate ? new Date(startDate).toISOString() : '',
+        endDate: endDate ? new Date(endDate).toISOString() : '',
         createdBy: user.uid,
         createdAt: new Date(),
         updatedAt: new Date(),
+        privacy,
         members: {
           [user.uid]: { role: 'admin', email: user.email }
         }
       });
-      setName('');
+      setDestination('');
+      setSelectedPlace(null);
       setStartDate('');
       setEndDate('');
+      setPrivacy('friends');
+      setInviteEmail('');
       onClose && onClose();
       navigate(`/trips/${docRef.id}`);
     } catch (err) {
       setError('Error creating trip: ' + err.message);
     } finally {
       setLoading(false);
+      setUnsplashLoading(false);
     }
+  };
+
+  const handleInvite = (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+    setInviteSent(true);
+    setTimeout(() => setInviteSent(false), 1500);
+    setInviteEmail('');
   };
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(34,58,95,0.18)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 24, boxShadow: '0 4px 24px rgba(71,181,255,0.10)', padding: 40, minWidth: 340, maxWidth: 400, width: '100%', display: 'flex', flexDirection: 'column', gap: 22, position: 'relative' }}>
+      <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 24, boxShadow: '0 4px 24px rgba(71,181,255,0.10)', padding: 40, minWidth: 340, maxWidth: 420, width: '100%', display: 'flex', flexDirection: 'column', gap: 22, position: 'relative' }}>
         <button type="button" onClick={onClose} style={{ position: 'absolute', top: 16, right: 18, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}>&times;</button>
-        <h2 style={{ textAlign: 'center', color: '#223a5f', fontWeight: 700, marginBottom: 12 }}>Create a New Trip</h2>
-        <label style={{ fontWeight: 600, color: '#2563eb' }}>Trip Name</label>
-        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Summer in Italy" style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
-        <label style={{ fontWeight: 600, color: '#2563eb' }}>Start Date</label>
-        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
-        <label style={{ fontWeight: 600, color: '#2563eb' }}>End Date</label>
-        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e0e0e0', fontSize: '1rem' }} />
-        {error && <div style={{ color: '#ff715b', textAlign: 'center', marginTop: 8 }}>{error}</div>}
-        <button type="submit" disabled={loading} style={{ background: 'linear-gradient(90deg, #47b5ff 0%, #2563eb 100%)', color: '#fff', border: 'none', borderRadius: 999, padding: '14px 0', fontWeight: 700, fontSize: '1.1rem', marginTop: 18, cursor: 'pointer', boxShadow: '0 2px 8px rgba(71,181,255,0.10)', transition: 'background 0.2s' }}>{loading ? 'Creating...' : 'Create Trip'}</button>
+        <h2 style={{ textAlign: 'center', color: '#223a5f', fontWeight: 700, marginBottom: 12 }}>Plan a new trip</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontWeight: 600, color: '#223a5f', marginBottom: 2 }}>Where to?</label>
+          <Autocomplete
+            freeSolo
+            options={placeOptions}
+            loading={placeLoading}
+            getOptionLabel={option => option.display_name || ''}
+            filterOptions={x => x}
+            value={selectedPlace}
+            onChange={(_, value) => setSelectedPlace(value)}
+            inputValue={destination}
+            onInputChange={(_, value) => { setDestination(value); if (!value) setSelectedPlace(null); }}
+            renderInput={(params) => (
+              <TextField {...params} placeholder="e.g. Paris, Hawaii, Japan" variant="outlined" size="small" />
+            )}
+            renderOption={(props, option) => (
+              <li {...props} key={option.place_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 8 }}>
+                <span style={{ fontWeight: 600 }}>{option.display_name.split(',')[0]}</span>
+                <span style={{ color: '#888', fontSize: 13 }}>{option.address.state || ''}{option.address.state && option.address.country ? ', ' : ''}{option.address.country || ''}</span>
+              </li>
+            )}
+            sx={{ mb: 0 }}
+          />
+          {error && <span style={{ color: '#ff715b', fontSize: 15, marginTop: 2 }}>{error}</span>}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontWeight: 600, color: '#223a5f', marginBottom: 2 }}>Dates <span style={{ color: '#888', fontWeight: 400 }}>(optional)</span></label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ flex: 1, padding: '12px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: '1rem' }} placeholder="Start date" />
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ flex: 1, padding: '12px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: '1rem' }} placeholder="End date" />
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TextField
+            type="email"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            placeholder="Enter an email address"
+            variant="outlined"
+            size="small"
+            sx={{ flex: 1, borderRadius: 3, bgcolor: '#f7f9fb', boxShadow: '0 1px 4px rgba(71,181,255,0.07)', '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+            InputProps={{ style: { borderRadius: 16, background: '#f7f9fb' } }}
+          />
+          <IconButton
+            type="button"
+            onClick={handleInvite}
+            sx={{ bgcolor: inviteSent ? '#22c55e' : '#e0f7fa', color: '#2563eb', borderRadius: '50%', width: 44, height: 44, boxShadow: '0 2px 8px rgba(71,181,255,0.10)', '&:hover': { bgcolor: '#47b5ff', color: '#fff' } }}
+          >
+            {inviteSent ? <SendIcon color="success" /> : <SendIcon />}
+          </IconButton>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 2, justifyContent: 'flex-end' }}>
+          <label style={{ fontWeight: 600, color: '#223a5f' }}>Privacy</label>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select value={privacy} onChange={e => setPrivacy(e.target.value)} displayEmpty sx={{ borderRadius: 2, bgcolor: '#f5faff' }}>
+              <MenuItem value="friends"><PeopleIcon sx={{ mr: 1 }} />Friends</MenuItem>
+              <MenuItem value="public"><PublicIcon sx={{ mr: 1 }} />Public</MenuItem>
+              <MenuItem value="private"><LockIcon sx={{ mr: 1 }} />Private</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        <button type="submit" disabled={loading} style={{ background: 'linear-gradient(90deg, #ff715b 0%, #ff9472 100%)', color: '#fff', border: 'none', borderRadius: 999, padding: '16px 0', fontWeight: 700, fontSize: '1.15rem', marginTop: 18, cursor: 'pointer', boxShadow: '0 2px 8px rgba(255,113,91,0.10)', transition: 'background 0.2s' }}>{loading ? 'Creating...' : 'Start planning'}</button>
       </form>
     </div>
   );
@@ -1164,6 +1297,15 @@ function MyTripsPage() {
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joinSuccess, setJoinSuccess] = useState('');
+  const fallbackImg = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80';
+  const [showTripModal, setShowTripModal] = useState(false);
+  const [inviteTripId, setInviteTripId] = useState(null); // for invite modal
+  const [inviteTab, setInviteTab] = useState(0);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState(null);
 
   useEffect(() => {
     const unsubAuth = auth.onAuthStateChanged(u => setUser(u));
@@ -1265,77 +1407,219 @@ function MyTripsPage() {
     }
   };
 
+  // Invite member handler (by email)
+  const handleInvite = async () => {
+    setInviteError('');
+    if (!inviteEmail) {
+      setInviteError('Please enter an email.');
+      return;
+    }
+    setInviteLoading(true);
+    try {
+      // Generate unique code
+      const code = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      // Add to trip members as before
+      const tripRef = doc(db, 'trips', inviteTripId);
+      await updateDoc(tripRef, {
+        [`members.${inviteEmail.replace(/\./g, '_').toLowerCase()}`]: { role: 'contributor', email: inviteEmail, inviteCode: code }
+      });
+      setInviteTripId(null);
+      setInviteEmail('');
+      setGeneratedCode(code);
+      // Copy to clipboard
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code);
+      }
+    } catch (err) {
+      setInviteError('Error inviting member: ' + err.message);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Generate and store a one-time code in Firestore
+  const handleGenerateCode = async () => {
+    setInviteError('');
+    setCodeLoading(true);
+    try {
+      const code = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      await addDoc(collection(db, 'tripInvites'), {
+        code,
+        tripId: inviteTripId,
+        email: null, // open code
+        used: false,
+        createdAt: new Date(),
+      });
+      setGeneratedCode(code);
+      if (navigator.clipboard) navigator.clipboard.writeText(code);
+    } catch (err) {
+      setInviteError('Error generating code: ' + err.message);
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+
   if (!user) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h6">Please log in to view your trips.</Typography></Box>;
   if (loading) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography>Loading trips...</Typography></Box>;
   if (error) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography color="error">{error}</Typography></Box>;
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', mt: 6, p: 3 }}>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 4, color: '#2563eb' }}>My Trips</Typography>
-      {/* Join Trip Section */}
-      <Box sx={{ mb: 4, p: 3, bgcolor: '#f5faff', borderRadius: 3, boxShadow: 1 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Join a Trip with Invite Code</Typography>
-        <form onSubmit={handleJoinTrip} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+    <Box sx={{ maxWidth: 600, mx: 'auto', mt: 6, p: 3, bgcolor: '#f7f9fb', borderRadius: 4, boxShadow: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#223a5f' }}>Your trips</Typography>
+        <Button
+          variant="contained"
+          sx={{ bgcolor: '#f5f6fa', color: '#222', borderRadius: 999, fontWeight: 700, boxShadow: 0, px: 3, py: 1.2, textTransform: 'none', fontSize: 16, '&:hover': { bgcolor: '#e0e0e0' } }}
+          onClick={() => setShowTripModal(true)}
+        >
+          + Plan new trip
+        </Button>
+      </Box>
+      {/* Created Trips Section */}
+      {createdTrips.length === 0 ? (
+        <Typography>No trips found for your account. Make sure your trips have a <b>createdBy</b> field with your user ID.</Typography>
+      ) : (
+        <List sx={{ p: 0 }}>
+          {createdTrips.map(trip => (
+            <Box
+              key={trip.id}
+              sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, p: 2, position: 'relative', border: '1.5px solid #e6eaf0', cursor: 'pointer', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: 4, background: '#f5faff' } }}
+              onClick={e => {
+                // Only trigger if not clicking an action button
+                if (e.target.closest('.trip-action-btn')) return;
+                navigate(`/trips/${trip.id}`);
+              }}
+            >
+              <img
+                src={trip.photoUrl || fallbackImg}
+                alt={trip.name}
+                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginRight: 16, boxShadow: '0 2px 8px rgba(71,181,255,0.10)' }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>{trip.name || 'Trip'}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#7b8794', fontSize: 15, mt: 0.5 }}>
+                  <span style={{ background: '#f5f6fa', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, marginRight: 6 }}>L</span>
+                  {trip.startDate && trip.endDate ? (
+                    <span>{dayjs(trip.startDate).format('MMM D')} – {dayjs(trip.endDate).format('MMM D')}{dayjs(trip.startDate).year() !== dayjs(trip.endDate).year() ? `, ${dayjs(trip.endDate).year()}` : ''}</span>
+                  ) : (
+                    <span>No dates</span>
+                  )}
+                  <span style={{ margin: '0 8px' }}>•</span>
+                  <span>0 places</span>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <IconButton className="trip-action-btn" color="primary" onClick={e => { e.stopPropagation(); navigate(`/trip/${trip.id}`); }} title="View Details"><VisibilityIcon /></IconButton>
+                <IconButton className="trip-action-btn" color="success" onClick={e => { e.stopPropagation(); setInviteTripId(trip.id); }} title="Share / Invite"><PersonAddIcon /></IconButton>
+                <IconButton className="trip-action-btn" color="error" onClick={e => { e.stopPropagation(); handleDelete(trip.id); }} title="Delete Trip"><DeleteIcon /></IconButton>
+              </Box>
+            </Box>
+          ))}
+        </List>
+      )}
+      {/* Join Trip Card */}
+      <Box sx={{ bgcolor: '#fff', borderRadius: 3, boxShadow: 1, p: 2.5, mb: 3, border: '1.5px solid #e6eaf0', mt: 4 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Join a Trip with Invite Code</Typography>
+        <form onSubmit={handleJoinTrip} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 0 }}>
           <TextField
             label="Invite Code"
             value={joinCode}
             onChange={e => setJoinCode(e.target.value)}
             required
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 180, borderRadius: 3, bgcolor: '#f7f9fb', boxShadow: '0 1px 4px rgba(71,181,255,0.07)', '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
             size="small"
+            InputProps={{ style: { borderRadius: 16, background: '#f7f9fb' } }}
           />
-          <Button type="submit" variant="contained" disabled={joinLoading} sx={{ borderRadius: 999 }}>
-            {joinLoading ? 'Joining...' : 'Join Trip'}
+          <Button type="submit" variant="contained" disabled={joinLoading} sx={{ borderRadius: 999, fontWeight: 700, px: 3, height: 44, minWidth: 110, fontSize: 16, boxShadow: '0 2px 8px rgba(71,181,255,0.10)', bgcolor: '#2563eb', '&:hover': { bgcolor: '#47b5ff' } }}>
+            {joinLoading ? 'Joining...' : 'JOIN TRIP'}
           </Button>
         </form>
         {joinError && <Typography color="error" sx={{ mt: 1 }}>{joinError}</Typography>}
         {joinSuccess && <Typography color="success.main" sx={{ mt: 1 }}>{joinSuccess}</Typography>}
       </Box>
-      {/* Created Trips Section */}
-      <Typography variant="h6" sx={{ mt: 4, mb: 2, color: '#2563eb' }}>Created by Me</Typography>
-      {createdTrips.length === 0 ? (
-        <Typography>No trips found for your account. Make sure your trips have a <b>createdBy</b> field with your user ID.</Typography>
-      ) : (
-        <List>
-          {createdTrips.map(trip => (
-            <ListItem key={trip.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>{trip.name}</Typography>
-                <Typography sx={{ color: '#888' }}>{dayjs(trip.startDate).format('MMM D, YYYY')} - {dayjs(trip.endDate).format('MMM D, YYYY')}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="contained" sx={{ borderRadius: 999 }} onClick={() => navigate(`/trips/${trip.id}`)}>Open Trip</Button>
-                <Button variant="outlined" sx={{ borderRadius: 999, ml: 1 }} onClick={() => navigate(`/trip/${trip.id}`)}>View Details</Button>
-                {trip.createdBy === user.uid && (
-                  <IconButton color="error" onClick={() => handleDelete(trip.id)} title="Delete Trip">
-                    <DeleteIcon />
-                  </IconButton>
-                )}
-              </Box>
-            </ListItem>
-          ))}
-        </List>
-      )}
       {/* Joined Trips Section */}
-      <Typography variant="h6" sx={{ mt: 4, mb: 2, color: '#2563eb' }}>Joined Trips</Typography>
-      {joinedTrips.length === 0 ? (
-        <Typography>No joined trips found. Join a trip using an invite code!</Typography>
-      ) : (
-        <List>
+      {joinedTrips.length > 0 && <Divider sx={{ my: 3 }} />}
+      {joinedTrips.length > 0 && (
+        <List sx={{ p: 0 }}>
           {joinedTrips.map(trip => (
-            <ListItem key={trip.id} sx={{ bgcolor: '#f8faff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>{trip.name}</Typography>
-                <Typography sx={{ color: '#888' }}>{dayjs(trip.startDate).format('MMM D, YYYY')} - {dayjs(trip.endDate).format('MMM D, YYYY')}</Typography>
+            <Box key={trip.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, p: 2, position: 'relative', border: '1.5px solid #e6eaf0' }}>
+              <img
+                src={trip.photoUrl || fallbackImg}
+                alt={trip.name}
+                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginRight: 16, boxShadow: '0 2px 8px rgba(71,181,255,0.10)' }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>{trip.name || 'Trip'}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#7b8794', fontSize: 15, mt: 0.5 }}>
+                  <span style={{ background: '#f5f6fa', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, marginRight: 6 }}>L</span>
+                  {trip.startDate && trip.endDate ? (
+                    <span>{dayjs(trip.startDate).format('MMM D')} – {dayjs(trip.endDate).format('MMM D')}{dayjs(trip.startDate).year() !== dayjs(trip.endDate).year() ? `, ${dayjs(trip.endDate).year()}` : ''}</span>
+                  ) : (
+                    <span>No dates</span>
+                  )}
+                  <span style={{ margin: '0 8px' }}>•</span>
+                  <span>0 places</span>
+                </Box>
               </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="contained" sx={{ borderRadius: 999 }} onClick={() => navigate(`/trips/${trip.id}`)}>Open Trip</Button>
-                <Button variant="outlined" sx={{ borderRadius: 999, ml: 1 }} onClick={() => navigate(`/trip/${trip.id}`)}>View Details</Button>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <IconButton color="primary" onClick={() => navigate(`/trip/${trip.id}`)} title="View Details"><VisibilityIcon /></IconButton>
+                <IconButton color="info" onClick={() => navigate(`/trips/${trip.id}`)} title="Edit"><EditIcon /></IconButton>
               </Box>
-            </ListItem>
+            </Box>
           ))}
         </List>
       )}
+      {/* Invite Member Modal (reuse your existing modal, pass tripId=inviteTripId) */}
+      <Dialog open={!!inviteTripId} onClose={() => setInviteTripId(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Invite Member</DialogTitle>
+        <IconButton onClick={() => setInviteTripId(null)} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
+        <DialogContent>
+          <Tabs value={inviteTab} onChange={(_, v) => setInviteTab(v)} sx={{ mb: 2 }}>
+            <Tab label="By Email" />
+            <Tab label="One-Time Code" />
+          </Tabs>
+          {inviteTab === 0 ? (
+            <>
+              <TextField
+                label="Email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                fullWidth
+                required
+                sx={{ mt: 2 }}
+              />
+              {inviteError && <Typography color="error" sx={{ mt: 1 }}>{inviteError}</Typography>}
+            </>
+          ) : (
+            <>
+              <Button
+                variant="contained"
+                onClick={handleGenerateCode}
+                disabled={codeLoading}
+                sx={{ borderRadius: 999, mt: 2 }}
+              >
+                {codeLoading ? 'Generating...' : 'Generate One-Time Code'}
+              </Button>
+              {generatedCode && (
+                <Box sx={{ mt: 3, bgcolor: '#f5f5f5', borderRadius: 2, p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 18 }}>{generatedCode}</Typography>
+                  <IconButton size="small" onClick={() => navigator.clipboard.writeText(generatedCode)}><ContentCopyIcon fontSize="small" /></IconButton>
+                </Box>
+              )}
+              {inviteError && <Typography color="error" sx={{ mt: 1 }}>{inviteError}</Typography>}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteTripId(null)}>Cancel</Button>
+          {inviteTab === 0 && (
+            <Button onClick={handleInvite} variant="contained" disabled={inviteLoading}>
+              {inviteLoading ? 'Inviting...' : 'Invite'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+      <TripCreateModal open={showTripModal} onClose={() => setShowTripModal(false)} />
     </Box>
   );
 }
