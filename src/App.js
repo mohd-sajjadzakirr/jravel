@@ -6,7 +6,7 @@ import MainPage from './MainPage';
 import DashboardPage from './DashboardPage';
 import MyDetailsPage from './MyDetailsPage';
 import Navbar from './Navbar';
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
 import { doc, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -41,6 +41,8 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import L from 'leaflet';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import ChatIcon from '@mui/icons-material/Chat';
 
 // Custom big marker icon
 const bigMarkerIcon = L.icon({
@@ -795,7 +797,7 @@ function TripItineraryPage() {
   const [days, setDays] = useState([]);
   const [isAddActivityModalOpen, setIsAddActivityModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 900);
-  const [tab, setTab] = useState(0); // 0: Itinerary, 1: Budget, 2: Documents, 3: Collaborators, 4: Settings
+  const [tab, setTab] = useState(0); // 0: Itinerary, 1: Budget, 2: Live Chat, 3: Collaborators, 4: Settings
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -829,6 +831,14 @@ function TripItineraryPage() {
   const [placeOptions, setPlaceOptions] = useState([]);
   const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [recommendedPlaces, setRecommendedPlaces] = useState([]);
+  // Add state for PDF preview modal
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [allDayPlans, setAllDayPlans] = useState([]);
+  const [overviewPlaces, setOverviewPlaces] = useState([]);
+  // In TripItineraryPage, fetch trip documents for overview
+  const [overviewDocuments, setOverviewDocuments] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
 
   useEffect(() => {
     const handleResize = () => {
@@ -1027,11 +1037,17 @@ function TripItineraryPage() {
   // Add document upload handler (store file name only, persist to Firestore)
   const handleDocUpload = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      const fileName = e.target.files[0].name;
+      const file = e.target.files[0];
+      const storageRef = ref(storage, `tripDocuments/${tripId}/${file.name}`);
       try {
+        // Upload file to Firebase Storage
+        await uploadBytes(storageRef, file);
+        // Get download URL
+        const url = await getDownloadURL(storageRef);
+        // Save to Firestore
         const tripRef = doc(db, 'trips', tripId);
         await updateDoc(tripRef, {
-          documents: [...documents, fileName]
+          documents: [...documents, { name: file.name, url }]
         });
       } catch (err) {
         alert('Error saving document: ' + err.message);
@@ -1120,6 +1136,78 @@ function TripItineraryPage() {
     await deleteDoc(doc(db, 'trips', tripId, 'placesToVisit', id));
   };
 
+  // Add delete handler for documents
+  const handleDeleteDocument = async (docObj) => {
+    if (!window.confirm(`Delete ${docObj.name}? This cannot be undone.`)) return;
+    try {
+      // Remove from Storage
+      if (docObj.url) {
+        const storageRef = ref(storage, `tripDocuments/${tripId}/${docObj.name}`);
+        await deleteObject(storageRef);
+      }
+      // Remove from Firestore
+      const tripRef = doc(db, 'trips', tripId);
+      await updateDoc(tripRef, {
+        documents: documents.filter(d => d.url !== docObj.url)
+      });
+    } catch (err) {
+      alert('Error deleting document: ' + err.message);
+    }
+  };
+
+  // Fetch all day plans for the trip
+  useEffect(() => {
+    if (!tripId) return;
+    const daysCol = collection(db, 'trips', tripId, 'days');
+    const unsub = onSnapshot(daysCol, (snap) => {
+      setAllDayPlans(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) return;
+    const q = collection(db, 'trips', tripId, 'placesToVisit');
+    const unsub = onSnapshot(q, (snap) => {
+      setOverviewPlaces(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) return;
+    const tripRef = doc(db, 'trips', tripId);
+    const unsub = onSnapshot(tripRef, (snap) => {
+      if (snap.exists()) {
+        setOverviewDocuments(snap.data().documents || []);
+      }
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) return;
+    const chatCol = collection(db, 'trips', tripId, 'chat');
+    const unsub = onSnapshot(chatCol, (snap) => {
+      setChatMessages(
+        snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
+      );
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    await addDoc(collection(db, 'trips', tripId, 'chat'), {
+      text: chatInput,
+      sender: auth.currentUser?.email || 'Anonymous',
+      createdAt: new Date(),
+    });
+    setChatInput('');
+  };
+
   if (!trip) {
     return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h5">Loading trip...</Typography></Box>;
   }
@@ -1142,7 +1230,7 @@ function TripItineraryPage() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ background: 'rgba(255,255,255,0.95)', borderBottom: '1px solid #e0e0e0', px: 4 }}>
         <Tab label="Itinerary" />
         <Tab label="Budget" />
-        <Tab label="Documents" />
+        <Tab label="LIVE CHAT" icon={<ChatIcon />} />
         <Tab label={<span><GroupAddIcon sx={{ mr: 1, fontSize: 20 }} />Collaborators</span>} />
         <Tab label="Settings" />
       </Tabs>
@@ -1376,6 +1464,34 @@ function TripItineraryPage() {
             onSave={() => setEditExpense(null)}
           />
         </Box>
+      ) : tab === 2 ? (
+        <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', height: 500 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Live Chat</Typography>
+          <Box sx={{ flex: 1, overflowY: 'auto', mb: 2, bgcolor: '#f7f9fb', borderRadius: 2, p: 2, boxShadow: 1 }}>
+            {chatMessages.length === 0 ? (
+              <Typography sx={{ color: '#bbb' }}>No messages yet. Start the conversation!</Typography>
+            ) : (
+              chatMessages.map(msg => (
+                <Box key={msg.id} sx={{ mb: 2, p: 1.5, bgcolor: '#fff', borderRadius: 2, boxShadow: 0.5 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{msg.sender}</Typography>
+                  <Typography sx={{ fontSize: 16 }}>{msg.text}</Typography>
+                  <Typography sx={{ color: '#888', fontSize: 12 }}>{msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleString() : ''}</Typography>
+                </Box>
+              ))
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              placeholder="Type a message..."
+              fullWidth
+              size="small"
+              onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
+            />
+            <Button variant="contained" onClick={handleSendChat} disabled={!chatInput.trim()}>Send</Button>
+          </Box>
+        </Box>
       ) : (
         <>
           {/* Day Navigation */}
@@ -1424,24 +1540,63 @@ function TripItineraryPage() {
               {sidebarSelected === 'overview' ? (
                 <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
                   <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#2563eb' }}>Itinerary Overview</Typography>
-                  {days.map((day, i) => (
-                    <Box key={i} sx={{ mb: 3 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#223a5f', mb: 1 }}>{day.format('dddd, MMMM D')}</Typography>
-                      {activitiesByDay[i].length === 0 ? (
-                        <Typography sx={{ color: '#bbb', fontSize: 15, mb: 1 }}>No activities planned.</Typography>
-                      ) : (
-                        <List>
-                          {activitiesByDay[i].map((act, idx) => (
-                            <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{act.title || act.name} {act.time && <span>({act.time})</span>}</Typography>
-                              <Typography variant="body2" sx={{ color: '#888' }}>{act.type} {act.location && `| ${act.location}`}</Typography>
-                              <Typography variant="body2">{act.notes || act.description}</Typography>
-                            </ListItem>
-                          ))}
-                        </List>
-                      )}
+                  {overviewPlaces.length > 0 && (
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#223a5f', mb: 1 }}>Places to Visit</Typography>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        {overviewPlaces.map(place => (
+                          <Box key={place.id} sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f7f9fb', borderRadius: 3, boxShadow: 1, p: 1.5, border: '1.5px solid #e6eaf0', mb: 1 }}>
+                            <img
+                              src={place.photoUrl || 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg'}
+                              alt={place.name}
+                              style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', marginRight: 12 }}
+                              onError={e => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/48x48?text=No+Image'; }}
+                            />
+                            <Box>
+                              <Typography sx={{ fontWeight: 600 }}>{place.name}</Typography>
+                              <Typography sx={{ color: '#888', fontSize: 13 }}>{place.address?.state || ''}{place.address?.state && place.address?.country ? ', ' : ''}{place.address?.country || ''}</Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
                     </Box>
-                  ))}
+                  )}
+                  {days.map((day, i) => {
+                    const plan = allDayPlans.find(d => d.id === day.format('YYYY-MM-DD'));
+                    return (
+                      <Box key={i} sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#223a5f', mb: 1 }}>{day.format('dddd, MMMM D')}</Typography>
+                        {plan && plan.activities && plan.activities.length > 0 ? (
+                          <List>
+                            {plan.activities.map((act, idx) => (
+                              <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{act.name} {act.time && <span>({act.time})</span>}</Typography>
+                                <Typography variant="body2" sx={{ color: '#888' }}>{act.type} {act.location && `| ${act.location}`}</Typography>
+                                <Typography variant="body2">{act.notes || act.description}</Typography>
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography sx={{ color: '#bbb', fontSize: 15, mb: 1 }}>No activities planned.</Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                  {overviewDocuments.length > 0 && (
+                    <Box sx={{ mt: 4 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#223a5f', mb: 1 }}>Documents</Typography>
+                      <List>
+                        {overviewDocuments.map((doc, idx) => (
+                          <ListItem key={idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <IconButton onClick={() => setPreviewUrl(doc.url)} title="Preview"><VisibilityIcon /></IconButton>
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#223a5f', fontWeight: 600, flex: 1 }}>
+                              {doc.name}
+                            </a>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  )}
                 </Paper>
               ) : sidebarSelected === 'explore' ? (
                 <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
@@ -1547,8 +1702,18 @@ function TripItineraryPage() {
                       <Typography sx={{ color: '#bbb', fontSize: 15, mt: 1 }}>No documents uploaded yet.</Typography>
                     ) : (
                       documents.map((doc, idx) => (
-                        <ListItem key={idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1 }}>
-                          <ListItemText primary={doc} />
+                        <ListItem key={idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          {doc.url ? (
+                            <>
+                              <IconButton onClick={() => setPreviewUrl(doc.url)} title="Preview"><VisibilityIcon /></IconButton>
+                              <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#223a5f', fontWeight: 600, flex: 1 }}>
+                                {doc.name}
+                              </a>
+                              <IconButton onClick={() => handleDeleteDocument(doc)} title="Delete"><DeleteIcon color="error" /></IconButton>
+                            </>
+                          ) : (
+                            <>{doc.name || doc}</>
+                          )}
                         </ListItem>
                       ))
                     )}
@@ -1594,6 +1759,15 @@ function TripItineraryPage() {
         activity={editActivity}
         onSave={() => setEditActivity(null)}
       />
+      {/* Add PDF preview modal */}
+      <Dialog open={!!previewUrl} onClose={() => setPreviewUrl(null)} maxWidth="md" fullWidth>
+        <DialogTitle>PDF Preview</DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {previewUrl && (
+            <iframe src={previewUrl} title="PDF Preview" style={{ width: '100%', height: '80vh', border: 'none' }} />
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
@@ -2279,27 +2453,17 @@ function DayPlanCard({ tripId, day, userId }) {
     setSaving(true);
     setError('');
     try {
-      await updateDoc(doc(collection(db, 'trips', tripId, 'days'), dayId), {
-        title,
-        notes,
-        activities,
-        userId,
-        updatedAt: new Date(),
-      }).catch(async (err) => {
-        // If doc doesn't exist, create it
-        if (err.code === 'not-found') {
-          await setDoc(doc(collection(db, 'trips', tripId, 'days'), dayId), {
-            title,
-            notes,
-            activities,
-            userId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        } else {
-          throw err;
-        }
-      });
+      await setDoc(
+        doc(collection(db, 'trips', tripId, 'days'), dayId),
+        {
+          title,
+          notes,
+          activities,
+          userId,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
     } catch (err) {
       setError('Error saving: ' + err.message);
     } finally {
