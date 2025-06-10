@@ -48,7 +48,7 @@ function LoginPage() {
     <div className="login-bg">
       <div className="login-container">
         <div className="login-left">
-          <img className="login-image" src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80" alt="Travel" />
+          <img className="login-image" src="https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg" alt="Travel" />
           <div className="login-quote">TRAVEL IS THE ONLY THING YOU BUY THAT MAKES YOU RICHER</div>
         </div>
         <div className="login-right">

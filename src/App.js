@@ -10,7 +10,7 @@ import { auth, db } from './firebase';
 import { doc, getDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, Container, Paper, Grid, Card } from '@mui/material';
+import { AppBar, Toolbar, Typography, Tabs, Tab, Box, Avatar, IconButton, Drawer, List, ListItem, ListItemText, Button, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, FormControl, InputLabel, Select, Container, Paper, Grid, Card, CardMedia } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import { onSnapshot, query, where, orderBy } from 'firebase/firestore';
@@ -100,7 +100,7 @@ function LandingPage() {
             </button>
           </div>
         </div>
-        <img className="hero-img" src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80" alt="Traveler" />
+        <img className="hero-img" src="https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg" alt="Traveler" />
       </header>
 
       {/* Services/Features */}
@@ -137,7 +137,7 @@ function LandingPage() {
         <h2 className="section-title">Top Destinations</h2>
         <div className="destination-cards">
           <div className="destination-card">
-            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=400&q=80" alt="Rome" />
+            <img src="https://images.pexels.com/photos/3601422/pexels-photo-3601422.jpeg" alt="Rome" />
             <div className="dest-info">
               <h4>Rome, Italy</h4>
               <p>$5.4k</p>
@@ -145,7 +145,7 @@ function LandingPage() {
             </div>
           </div>
           <div className="destination-card">
-            <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=400&q=80" alt="London" />
+            <img src="https://images.pexels.com/photos/3601421/pexels-photo-3601421.jpeg" alt="London" />
             <div className="dest-info">
               <h4>London, UK</h4>
               <p>$4.2k</p>
@@ -153,7 +153,7 @@ function LandingPage() {
             </div>
           </div>
           <div className="destination-card">
-            <img src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=400&q=80" alt="Europe" />
+            <img src="https://images.pexels.com/photos/3601420/pexels-photo-3601420.jpeg" alt="Europe" />
             <div className="dest-info">
               <h4>Full Europe</h4>
               <p>$15k</p>
@@ -191,7 +191,7 @@ function LandingPage() {
           </div>
         </div>
         <div className="trip-card">
-          <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80" alt="Trip to Greece" />
+          <img src="https://images.pexels.com/photos/3601419/pexels-photo-3601419.jpeg" alt="Trip to Greece" />
           <div className="trip-info">
             <h4>Trip To Greece</h4>
             <p>14-29 June | by Robbie</p>
@@ -300,7 +300,7 @@ function TripCreateModal({ open, onClose, onCreated }) {
   const [user, setUser] = useState(null);
   const [inviteSent, setInviteSent] = useState(false);
   const navigate = useNavigate();
-  const [unsplashLoading, setUnsplashLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(u => setUser(u));
@@ -328,31 +328,15 @@ function TripCreateModal({ open, onClose, onCreated }) {
     return () => controller.abort();
   }, [destination]);
 
-  const fetchPlacePhoto = async (placeName, placeObj) => {
-    // Try to use city, state, country for more unique images
-    let query = '';
-    if (placeObj && placeObj.address) {
-      if (placeObj.address.city) query = placeObj.address.city;
-      else if (placeObj.address.town) query = placeObj.address.town;
-      else if (placeObj.address.village) query = placeObj.address.village;
-      else if (placeObj.address.state) query = placeObj.address.state;
-      else if (placeObj.address.country) query = placeObj.address.country;
-      if (placeObj.address.state && placeObj.address.country) query += ', ' + placeObj.address.state + ', ' + placeObj.address.country;
-      else if (placeObj.address.country) query += ', ' + placeObj.address.country;
-    }
-    if (!query) query = placeName;
-    const UNSPLASH_ACCESS_KEY = 'Nk6iaf-mKBBI1Den__rwllLYFgdKqmoEuRaRMU3ixLsU';
-    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${UNSPLASH_ACCESS_KEY}&orientation=landscape&per_page=1`;
-    try {
-      const res = await fetch(url);
-      if (res.status === 401) throw new Error('Unauthorized');
-      const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        return data.results[0].urls.regular;
-      }
-    } catch (e) {}
-    // fallback: Wikimedia or a static image
-    return `https://source.unsplash.com/600x400/?${encodeURIComponent(query)}`;
+  const getPlaceImage = async (query) => {
+    const fallbackImages = [
+      'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg',
+      'https://images.pexels.com/photos/3601422/pexels-photo-3601422.jpeg',
+      'https://images.pexels.com/photos/3601421/pexels-photo-3601421.jpeg',
+      'https://images.pexels.com/photos/3601420/pexels-photo-3601420.jpeg',
+      'https://images.pexels.com/photos/3601419/pexels-photo-3601419.jpeg'
+    ];
+    return fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
   };
 
   if (!open) return null;
@@ -369,11 +353,11 @@ function TripCreateModal({ open, onClose, onCreated }) {
       return;
     }
     setLoading(true);
-    setUnsplashLoading(true);
+    setImageLoading(true);
     try {
       // Fetch a famous photo for the place
-      const photoUrl = await fetchPlacePhoto(selectedPlace.display_name.split(',')[0], selectedPlace);
-      setUnsplashLoading(false);
+      const photoUrl = await getPlaceImage(selectedPlace.display_name.split(',')[0]);
+      setImageLoading(false);
       const docRef = await addDoc(collection(db, 'trips'), {
         name: selectedPlace.display_name,
         place: selectedPlace,
@@ -400,7 +384,7 @@ function TripCreateModal({ open, onClose, onCreated }) {
       setError('Error creating trip: ' + err.message);
     } finally {
       setLoading(false);
-      setUnsplashLoading(false);
+      setImageLoading(false);
     }
   };
 
@@ -1087,9 +1071,9 @@ function TripItineraryPage() {
     if (!trip || !trip.place) return;
     // Example: static recommendations for demo
     setRecommendedPlaces([
-      { name: "Humayun's Tomb", photo: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Humayun%27s_Tomb%2C_Delhi.jpg' },
-      { name: 'India Gate', photo: 'https://upload.wikimedia.org/wikipedia/commons/5/5b/India_Gate_in_New_Delhi_03-2016.jpg' },
-      { name: 'Lodhi Gardens', photo: 'https://upload.wikimedia.org/wikipedia/commons/6/6e/Lodhi_Gardens_New_Delhi.jpg' },
+      { name: "Humayun's Tomb", photo: 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg' },
+      { name: 'India Gate', photo: 'https://images.pexels.com/photos/3601422/pexels-photo-3601422.jpeg' },
+      { name: 'Lodhi Gardens', photo: 'https://images.pexels.com/photos/3601421/pexels-photo-3601421.jpeg' }
     ]);
   }, [trip]);
 
@@ -1117,20 +1101,9 @@ function TripItineraryPage() {
   // Add place to Firestore
   const handleAddPlace = async (place) => {
     if (!place) return;
-    // Fetch Unsplash image
-    let photoUrl = '';
-    try {
-      const UNSPLASH_ACCESS_KEY = 'Nk6iaf-mKBBI1Den__rwllLYFgdKqmoEuRaRMU3ixLsU';
-      const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(place.display_name || place.name)}&client_id=${UNSPLASH_ACCESS_KEY}&orientation=landscape&per_page=1`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        photoUrl = data.results[0].urls.regular;
-      } else {
-        photoUrl = `https://source.unsplash.com/400x300/?${encodeURIComponent(place.display_name || place.name)}`;
-      }
-    } catch {
-      photoUrl = `https://source.unsplash.com/400x300/?${encodeURIComponent(place.display_name || place.name)}`;
+    let photoUrl = place.photoUrl || place.photo || '';
+    if (!photoUrl) {
+      photoUrl = 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg';
     }
     await addDoc(collection(db, 'trips', tripId, 'placesToVisit'), {
       name: place.display_name || place.name,
@@ -1501,9 +1474,14 @@ function TripItineraryPage() {
                       <TextField {...params} placeholder="Add a place" variant="outlined" size="small" InputProps={{ ...params.InputProps, startAdornment: <span style={{ color: '#bbb', marginRight: 8 }}>📍</span> }} />
                     )}
                     renderOption={(props, option) => (
-                      <li {...props} key={option.place_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 8 }}>
-                        <span style={{ fontWeight: 600 }}>{option.display_name.split(',')[0]}</span>
-                        <span style={{ color: '#888', fontSize: 13 }}>{option.address?.state || ''}{option.address?.state && option.address?.country ? ', ' : ''}{option.address?.country || ''}</span>
+                      <li {...props} key={option.place_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 8 }}>
+                        <Box>
+                          <span style={{ fontWeight: 600 }}>{option.display_name.split(',')[0]}</span>
+                          <span style={{ color: '#888', fontSize: 13, marginLeft: 8 }}>{option.address?.state || ''}{option.address?.state && option.address?.country ? ', ' : ''}{option.address?.country || ''}</span>
+                        </Box>
+                        <IconButton size="small" onClick={e => { e.stopPropagation(); handleAddPlace(option); }} sx={{ ml: 1 }}>
+                          <AddIcon fontSize="small" />
+                        </IconButton>
                       </li>
                     )}
                     sx={{ mb: 2, maxWidth: 480 }}
@@ -1514,7 +1492,12 @@ function TripItineraryPage() {
                     <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
                       {recommendedPlaces.map((place, idx) => (
                         <Box key={idx} sx={{ minWidth: 200, maxWidth: 220, bgcolor: '#f7f9fb', borderRadius: 3, boxShadow: 1, display: 'flex', alignItems: 'center', p: 1, pr: 2, border: '1.5px solid #e6eaf0', mr: 2 }}>
-                          <img src={place.photo} alt={place.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }} />
+                          <img
+                            src={place.photo}
+                            alt={place.name}
+                            style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }}
+                            onError={e => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/56x56?text=No+Image'; }}
+                          />
                           <Box sx={{ flex: 1 }}>
                             <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{place.name}</Typography>
                           </Box>
@@ -1534,7 +1517,12 @@ function TripItineraryPage() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {placesToVisit.map(place => (
                         <Box key={place.id} sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f7f9fb', borderRadius: 3, boxShadow: 1, p: 1.5, border: '1.5px solid #e6eaf0' }}>
-                          <img src={place.photoUrl} alt={place.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }} />
+                          <img
+                            src={place.photoUrl || 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg'}
+                            alt={place.name}
+                            style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }}
+                            onError={e => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/56x56?text=No+Image'; }}
+                          />
                           <Box sx={{ flex: 1 }}>
                             <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{place.name}</Typography>
                             <Typography sx={{ color: '#888', fontSize: 13 }}>{place.address?.state || ''}{place.address?.state && place.address?.country ? ', ' : ''}{place.address?.country || ''}</Typography>
@@ -1621,7 +1609,7 @@ function MyTripsPage() {
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joinSuccess, setJoinSuccess] = useState('');
-  const fallbackImg = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80';
+  const fallbackImg = 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg';
   const [showTripModal, setShowTripModal] = useState(false);
   const [inviteTripId, setInviteTripId] = useState(null); // for invite modal
   const [inviteTab, setInviteTab] = useState(0);
@@ -1814,10 +1802,28 @@ function MyTripsPage() {
                 navigate(`/trips/${trip.id}`);
               }}
             >
-              <img
-                src={trip.photoUrl || fallbackImg}
-                alt={trip.name}
-                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginRight: 16, boxShadow: '0 2px 8px rgba(71,181,255,0.10)' }}
+              <CardMedia
+                component="img"
+                height="100"
+                image={trip.image || 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg'}
+                alt={trip.destination}
+                sx={{
+                  objectFit: 'cover',
+                  borderRadius: 2.5,
+                  position: 'relative',
+                  maxWidth: 160,
+                  minWidth: 120,
+                  width: '100%',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.4))',
+                  }
+                }}
               />
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>{trip.name || 'Trip'}</Typography>
@@ -1875,10 +1881,28 @@ function MyTripsPage() {
                 navigate(`/trips/${trip.id}`);
               }}
             >
-              <img
-                src={trip.photoUrl || fallbackImg}
-                alt={trip.name}
-                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginRight: 16, boxShadow: '0 2px 8px rgba(71,181,255,0.10)' }}
+              <CardMedia
+                component="img"
+                height="100"
+                image={trip.image || 'https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg'}
+                alt={trip.destination}
+                sx={{
+                  objectFit: 'cover',
+                  borderRadius: 2.5,
+                  position: 'relative',
+                  maxWidth: 160,
+                  minWidth: 120,
+                  width: '100%',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.4))',
+                  }
+                }}
               />
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>{trip.name || 'Trip'}</Typography>
