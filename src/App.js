@@ -36,6 +36,8 @@ import Autocomplete from '@mui/material/Autocomplete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -815,6 +817,9 @@ function TripItineraryPage() {
   const [inviteTab, setInviteTab] = useState(0); // 0: Email, 1: Code
   const [codeLoading, setCodeLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState(null);
+  const [showDocuments, setShowDocuments] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [docUploadName, setDocUploadName] = useState('');
 
   useEffect(() => {
     const handleResize = () => {
@@ -825,13 +830,15 @@ function TripItineraryPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Fetch trip data
+  // Fetch trip data and listen for document changes
   useEffect(() => {
     if (!tripId) return;
     const unsub = onSnapshot(doc(db, 'trips', tripId), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setTrip({ id: docSnap.id, ...data });
+        // Listen for documents array
+        setDocuments(data.documents || []);
         // Calculate days array
         const start = dayjs(data.startDate);
         const end = dayjs(data.endDate);
@@ -991,6 +998,21 @@ function TripItineraryPage() {
       setInviteError('Error generating code: ' + err.message);
     } finally {
       setCodeLoading(false);
+    }
+  };
+
+  // Add document upload handler (store file name only, persist to Firestore)
+  const handleDocUpload = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const fileName = e.target.files[0].name;
+      try {
+        const tripRef = doc(db, 'trips', tripId);
+        await updateDoc(tripRef, {
+          documents: [...documents, fileName]
+        });
+      } catch (err) {
+        alert('Error saving document: ' + err.message);
+      }
     }
   };
 
@@ -1194,7 +1216,7 @@ function TripItineraryPage() {
                 key={i}
                 variant={i === selectedDay ? 'contained' : 'outlined'}
                 sx={{ borderRadius: 999, minWidth: 100, fontWeight: 700 }}
-                onClick={() => setSelectedDay(i)}
+                onClick={() => { setSelectedDay(i); setShowDocuments(false); }}
               >
                 {`Day ${i + 1}`}<br />{day.format('MMM D')}
               </Button>
@@ -1207,27 +1229,51 @@ function TripItineraryPage() {
               <Box sx={{ p: 3, pt: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: '#223a5f' }}>Menu</Typography>
                 <List>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
                     <ListItemText primary="Overview" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
                     <ListItemText primary="Explore" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
                     <ListItemText primary="Notes" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }}>
+                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
                     <ListItemText primary="Places to visit" />
                   </ListItem>
-                  <ListItem button selected sx={{ borderRadius: 2, mb: 1, bgcolor: '#eaf6fb', fontWeight: 700 }}>
+                  <ListItem button selected={showDocuments} sx={{ borderRadius: 2, mb: 1, bgcolor: showDocuments ? '#eaf6fb' : undefined, fontWeight: showDocuments ? 700 : 500 }} onClick={() => setShowDocuments(true)}>
+                    <ListItemText primary="View Documents" />
+                  </ListItem>
+                  <ListItem button selected={!showDocuments} sx={{ borderRadius: 2, mb: 1, bgcolor: !showDocuments ? '#eaf6fb' : undefined, fontWeight: !showDocuments ? 700 : 500 }} onClick={() => setShowDocuments(false)}>
                     <ListItemText primary={`Itinerary for ${days[selectedDay]?.format('dddd, MMMM D') || ''}`} />
                   </ListItem>
                 </List>
               </Box>
             </Box>
-            {/* Center: Itinerary Days as Cards */}
+            {/* Center: Itinerary Days as Cards or Documents */}
             <Box sx={{ flex: 1, px: { xs: 1, sm: 3 }, py: 3, maxWidth: 700, mx: 'auto' }}>
-              {days[selectedDay] && (
+              {showDocuments ? (
+                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Documents</Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Button variant="outlined" component="label" sx={{ borderRadius: 999, fontWeight: 700, px: 3 }}>
+                      Upload Document
+                      <input type="file" hidden onChange={handleDocUpload} />
+                    </Button>
+                  </Box>
+                  <List>
+                    {documents.length === 0 ? (
+                      <Typography sx={{ color: '#bbb', fontSize: 15, mt: 1 }}>No documents uploaded yet.</Typography>
+                    ) : (
+                      documents.map((doc, idx) => (
+                        <ListItem key={idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1 }}>
+                          <ListItemText primary={doc} />
+                        </ListItem>
+                      ))
+                    )}
+                  </List>
+                </Paper>
+              ) : days[selectedDay] && (
                 <DayPlanCard
                   tripId={tripId}
                   day={days[selectedDay]}
@@ -1235,14 +1281,14 @@ function TripItineraryPage() {
                 />
               )}
             </Box>
-            {/* Right Sidebar: Map (already present) */}
+            {/* Right Sidebar: Map (make larger) */}
             {trip && trip.place && trip.place.lat && trip.place.lon && (
-              <Paper sx={{ minWidth: 340, maxWidth: 400, minHeight: 340, borderRadius: 4, boxShadow: 3, p: 2, position: { md: 'sticky' }, top: 100, display: { xs: 'none', md: 'block' } }}>
+              <Paper sx={{ minWidth: 420, maxWidth: 520, minHeight: 420, borderRadius: 4, boxShadow: 3, p: 2, position: { md: 'sticky' }, top: 100, display: { xs: 'none', md: 'block' } }}>
                 <Typography variant="h6" sx={{ color: '#2563eb', mb: 1 }}>Trip Location</Typography>
                 <MapContainer
                   center={[parseFloat(trip.place.lat), parseFloat(trip.place.lon)]}
                   zoom={10}
-                  style={{ height: 300, width: '100%', borderRadius: 16, boxShadow: '0 4px 24px rgba(71,181,255,0.10)' }}
+                  style={{ height: 380, width: '100%', borderRadius: 16, boxShadow: '0 4px 24px rgba(71,181,255,0.10)' }}
                   scrollWheelZoom={true}
                 >
                   <TileLayer
@@ -1800,8 +1846,26 @@ function DayPlanCard({ tripId, day, userId }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [activityForm, setActivityForm] = useState({ name: '', time: '', type: '', notes: '', id: '' });
+  const [activityForm, setActivityForm] = useState({
+    name: '',
+    time: '',
+    type: '',
+    location: '',
+    duration: '',
+    durationUnit: 'minutes',
+    cost: '',
+    participants: [],
+    priority: '',
+    status: '',
+    confirmation: '',
+    website: '',
+    attachment: '',
+    reminder: false,
+    notes: '',
+    id: ''
+  });
   const [editIdx, setEditIdx] = useState(null);
+  const [members, setMembers] = useState([]);
   const dayId = day.format('YYYY-MM-DD');
 
   useEffect(() => {
@@ -1830,8 +1894,28 @@ function DayPlanCard({ tripId, day, userId }) {
     return () => unsub();
   }, [tripId, dayId]);
 
+  // Fetch trip members for participants field
+  useEffect(() => {
+    const tripRef = doc(db, 'trips', tripId);
+    const unsub = onSnapshot(tripRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.members) {
+          setMembers(Object.values(data.members));
+        }
+      }
+    });
+    return () => unsub();
+  }, [tripId]);
+
   const handleActivityChange = (field, value) => {
     setActivityForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAttachment = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setActivityForm((prev) => ({ ...prev, attachment: e.target.files[0].name }));
+    }
   };
 
   const handleAddOrEditActivity = (e) => {
@@ -1849,7 +1933,9 @@ function DayPlanCard({ tripId, day, userId }) {
         { ...activityForm, id: Date.now().toString() },
       ]);
     }
-    setActivityForm({ name: '', time: '', type: '', notes: '', id: '' });
+    setActivityForm({
+      name: '', time: '', type: '', location: '', duration: '', durationUnit: 'minutes', cost: '', participants: [], priority: '', status: '', confirmation: '', website: '', attachment: '', reminder: false, notes: '', id: ''
+    });
   };
 
   const handleEdit = (idx) => {
@@ -1861,7 +1947,7 @@ function DayPlanCard({ tripId, day, userId }) {
     setActivities((prev) => prev.filter((_, i) => i !== idx));
     if (editIdx === idx) {
       setEditIdx(null);
-      setActivityForm({ name: '', time: '', type: '', notes: '', id: '' });
+      setActivityForm({ name: '', time: '', type: '', location: '', duration: '', durationUnit: 'minutes', cost: '', participants: [], priority: '', status: '', confirmation: '', website: '', attachment: '', reminder: false, notes: '', id: '' });
     }
   };
 
@@ -1925,12 +2011,20 @@ function DayPlanCard({ tripId, day, userId }) {
       {/* Activities List */}
       <List>
         {activities.length ? activities.map((act, idx) => (
-          <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <ListItemText
-              primary={act.name + (act.time ? ` (${act.time})` : '')}
-              secondary={act.type ? `${act.type}${act.notes ? ' - ' + act.notes : ''}` : act.notes}
-            />
-            <Box sx={{ display: 'flex', gap: 1 }}>
+          <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexDirection: 'column' }}>
+            <Box sx={{ width: '100%' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{act.name} {act.time && <span>({act.time})</span>}</Typography>
+              <Typography variant="body2" sx={{ color: '#888' }}>{act.type} {act.location && `| ${act.location}`}</Typography>
+              <Typography variant="body2">{act.duration && `Duration: ${act.duration} ${act.durationUnit}`}{act.cost && ` | Cost: ₹${act.cost}`}</Typography>
+              <Typography variant="body2">{act.status && `Status: ${act.status}`} {act.priority && `| Priority: ${act.priority}`}</Typography>
+              <Typography variant="body2">{act.participants && act.participants.length > 0 && `Participants: ${act.participants.map(p => p.email || p).join(', ')}`}</Typography>
+              <Typography variant="body2">{act.confirmation && `Confirmation: ${act.confirmation}`}</Typography>
+              <Typography variant="body2">{act.website && <a href={act.website} target="_blank" rel="noopener noreferrer">Website</a>}</Typography>
+              <Typography variant="body2">{act.attachment && `Attachment: ${act.attachment}`}</Typography>
+              <Typography variant="body2">{act.reminder ? '🔔 Reminder set' : ''}</Typography>
+              <Typography variant="body2" sx={{ color: '#555', mt: 0.5 }}>{act.notes}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
               <IconButton edge="end" color="primary" onClick={() => handleEdit(idx)}><EditIcon /></IconButton>
               <IconButton edge="end" color="error" onClick={() => handleDelete(idx)}><DeleteIcon /></IconButton>
             </Box>
@@ -1967,9 +2061,120 @@ function DayPlanCard({ tripId, day, userId }) {
             <MenuItem value="Food">Food</MenuItem>
             <MenuItem value="Hotel">Hotel</MenuItem>
             <MenuItem value="Transport">Transport</MenuItem>
+            <MenuItem value="Shopping">Shopping</MenuItem>
+            <MenuItem value="Adventure">Adventure</MenuItem>
+            <MenuItem value="Relaxation">Relaxation</MenuItem>
+            <MenuItem value="Meeting">Meeting</MenuItem>
+            <MenuItem value="Event">Event</MenuItem>
             <MenuItem value="Other">Other</MenuItem>
           </Select>
         </FormControl>
+        <TextField
+          placeholder="Location"
+          value={activityForm.location}
+          onChange={e => handleActivityChange('location', e.target.value)}
+          size="small"
+          sx={{ minWidth: 120 }}
+        />
+        <TextField
+          placeholder="Duration"
+          value={activityForm.duration}
+          onChange={e => handleActivityChange('duration', e.target.value)}
+          size="small"
+          sx={{ minWidth: 80 }}
+          type="number"
+          inputProps={{ min: 0 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 80 }}>
+          <InputLabel>Unit</InputLabel>
+          <Select
+            value={activityForm.durationUnit}
+            label="Unit"
+            onChange={e => handleActivityChange('durationUnit', e.target.value)}
+          >
+            <MenuItem value="minutes">Minutes</MenuItem>
+            <MenuItem value="hours">Hours</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          placeholder="Cost"
+          value={activityForm.cost}
+          onChange={e => handleActivityChange('cost', e.target.value)}
+          size="small"
+          sx={{ minWidth: 80 }}
+          type="number"
+          inputProps={{ min: 0 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Priority</InputLabel>
+          <Select
+            value={activityForm.priority}
+            label="Priority"
+            onChange={e => handleActivityChange('priority', e.target.value)}
+          >
+            <MenuItem value="High">High</MenuItem>
+            <MenuItem value="Medium">Medium</MenuItem>
+            <MenuItem value="Low">Low</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={activityForm.status}
+            label="Status"
+            onChange={e => handleActivityChange('status', e.target.value)}
+          >
+            <MenuItem value="Planned">Planned</MenuItem>
+            <MenuItem value="Booked">Booked</MenuItem>
+            <MenuItem value="Completed">Completed</MenuItem>
+            <MenuItem value="Cancelled">Cancelled</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Participants</InputLabel>
+          <Select
+            multiple
+            value={activityForm.participants}
+            onChange={e => handleActivityChange('participants', e.target.value)}
+            renderValue={selected => selected.map(p => p.email || p).join(', ')}
+          >
+            {members.map((m, i) => (
+              <MenuItem key={i} value={m.email || m.id}>
+                <Checkbox checked={activityForm.participants.indexOf(m.email || m.id) > -1} />
+                <ListItemText primary={m.email || m.id} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField
+          placeholder="Confirmation/Booking Info"
+          value={activityForm.confirmation}
+          onChange={e => handleActivityChange('confirmation', e.target.value)}
+          size="small"
+          sx={{ minWidth: 140 }}
+        />
+        <TextField
+          placeholder="Website/Link"
+          value={activityForm.website}
+          onChange={e => handleActivityChange('website', e.target.value)}
+          size="small"
+          sx={{ minWidth: 140 }}
+          type="url"
+        />
+        <Button
+          variant="outlined"
+          component="label"
+          size="small"
+          sx={{ minWidth: 120 }}
+        >
+          Upload Attachment
+          <input type="file" hidden onChange={handleAttachment} />
+        </Button>
+        <FormControlLabel
+          control={<Checkbox checked={activityForm.reminder} onChange={e => handleActivityChange('reminder', e.target.checked)} />}
+          label="Set Reminder"
+          sx={{ minWidth: 120 }}
+        />
         <TextField
           placeholder="Notes"
           value={activityForm.notes}
