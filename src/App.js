@@ -38,6 +38,17 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import L from 'leaflet';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+
+// Custom big marker icon
+const bigMarkerIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Example: big colorful marker
+  iconSize: [48, 48],
+  iconAnchor: [24, 48],
+  popupAnchor: [0, -48],
+});
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -820,6 +831,20 @@ function TripItineraryPage() {
   const [showDocuments, setShowDocuments] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [docUploadName, setDocUploadName] = useState('');
+  // Budget section state
+  const [expenseSort, setExpenseSort] = useState('date_desc');
+  const [showSetBudget, setShowSetBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const [budgetSaving, setBudgetSaving] = useState(false);
+  const [sortedExpenses, setSortedExpenses] = useState([]);
+  const [sidebarSelected, setSidebarSelected] = useState('overview');
+  // Add at the top of TripItineraryPage
+  const [placesToVisit, setPlacesToVisit] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placeSearch, setPlaceSearch] = useState('');
+  const [placeOptions, setPlaceOptions] = useState([]);
+  const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
+  const [recommendedPlaces, setRecommendedPlaces] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -877,6 +902,20 @@ function TripItineraryPage() {
     });
     return () => unsub();
   }, [tripId]);
+
+  useEffect(() => {
+    let sorted = [...budgetTabExpenses];
+    if (expenseSort === 'date_desc') {
+      sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+    } else if (expenseSort === 'date_asc') {
+      sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+    } else if (expenseSort === 'amount_desc') {
+      sorted.sort((a, b) => (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0));
+    } else if (expenseSort === 'amount_asc') {
+      sorted.sort((a, b) => (parseFloat(a.amount) || 0) - (parseFloat(b.amount) || 0));
+    }
+    setSortedExpenses(sorted);
+  }, [budgetTabExpenses, expenseSort]);
 
   // Group activities by day
   const activitiesByDay = days.map(day =>
@@ -1014,6 +1053,98 @@ function TripItineraryPage() {
         alert('Error saving document: ' + err.message);
       }
     }
+  };
+
+  // Set trip budget in Firestore
+  const handleSetBudget = async () => {
+    if (!budgetInput || isNaN(budgetInput) || parseFloat(budgetInput) < 0) return;
+    setBudgetSaving(true);
+    try {
+      await updateDoc(doc(db, 'trips', tripId), { budget: parseFloat(budgetInput) });
+      setShowSetBudget(false);
+      setBudgetInput('');
+    } catch (err) {
+      alert('Error saving budget: ' + err.message);
+    } finally {
+      setBudgetSaving(false);
+    }
+  };
+
+  // Fetch saved places to visit from Firestore
+  useEffect(() => {
+    if (!tripId) return;
+    setPlacesLoading(true);
+    const q = query(collection(db, 'trips', tripId, 'placesToVisit'));
+    const unsub = onSnapshot(q, (snap) => {
+      setPlacesToVisit(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setPlacesLoading(false);
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  // Fetch recommended places (static or based on trip.place)
+  useEffect(() => {
+    if (!trip || !trip.place) return;
+    // Example: static recommendations for demo
+    setRecommendedPlaces([
+      { name: "Humayun's Tomb", photo: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Humayun%27s_Tomb%2C_Delhi.jpg' },
+      { name: 'India Gate', photo: 'https://upload.wikimedia.org/wikipedia/commons/5/5b/India_Gate_in_New_Delhi_03-2016.jpg' },
+      { name: 'Lodhi Gardens', photo: 'https://upload.wikimedia.org/wikipedia/commons/6/6e/Lodhi_Gardens_New_Delhi.jpg' },
+    ]);
+  }, [trip]);
+
+  // Place search autocomplete (Nominatim)
+  useEffect(() => {
+    if (!placeSearch || placeSearch.length < 2) {
+      setPlaceOptions([]);
+      return;
+    }
+    setPlaceSearchLoading(true);
+    const controller = new AbortController();
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeSearch)}&addressdetails=1&limit=6`, {
+      signal: controller.signal,
+      headers: { 'Accept-Language': 'en' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setPlaceOptions(data);
+        setPlaceSearchLoading(false);
+      })
+      .catch(() => setPlaceSearchLoading(false));
+    return () => controller.abort();
+  }, [placeSearch]);
+
+  // Add place to Firestore
+  const handleAddPlace = async (place) => {
+    if (!place) return;
+    // Fetch Unsplash image
+    let photoUrl = '';
+    try {
+      const UNSPLASH_ACCESS_KEY = 'Nk6iaf-mKBBI1Den__rwllLYFgdKqmoEuRaRMU3ixLsU';
+      const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(place.display_name || place.name)}&client_id=${UNSPLASH_ACCESS_KEY}&orientation=landscape&per_page=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        photoUrl = data.results[0].urls.regular;
+      } else {
+        photoUrl = `https://source.unsplash.com/400x300/?${encodeURIComponent(place.display_name || place.name)}`;
+      }
+    } catch {
+      photoUrl = `https://source.unsplash.com/400x300/?${encodeURIComponent(place.display_name || place.name)}`;
+    }
+    await addDoc(collection(db, 'trips', tripId, 'placesToVisit'), {
+      name: place.display_name || place.name,
+      address: place.address || {},
+      photoUrl,
+      createdAt: new Date(),
+    });
+    setPlaceSearch('');
+    setPlaceOptions([]);
+  };
+
+  // Remove place from Firestore
+  const handleRemovePlace = async (id) => {
+    await deleteDoc(doc(db, 'trips', tripId, 'placesToVisit', id));
   };
 
   if (!trip) {
@@ -1169,20 +1300,64 @@ function TripItineraryPage() {
         </Box>
       ) : tab === 1 ? (
         <Box sx={{ p: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Budget</Typography>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setBudgetModalOpen(true)}>
-              Add Expense
+          {/* Budget Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#223a5f' }}>Budgeting</Typography>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#ff715b', color: '#fff', borderRadius: 999, fontWeight: 700, fontSize: 16, px: 3, py: 1.2, boxShadow: 0, textTransform: 'none', '&:hover': { bgcolor: '#ff9472' } }}
+              startIcon={<AddIcon />}
+              onClick={() => setBudgetModalOpen(true)}
+            >
+              Add expense
             </Button>
           </Box>
-          <Typography sx={{ mb: 2, fontWeight: 600 }}>Total Spent: <span style={{ color: '#2563eb' }}>₹{totalSpent.toFixed(2)}</span></Typography>
+          {/* Budget Summary Card */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+            <Paper sx={{ flex: 1, minWidth: 260, p: 3, borderRadius: 4, boxShadow: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 28, color: '#223a5f' }}>₹{totalSpent.toFixed(2)}</Typography>
+              <Typography sx={{ color: '#888', fontWeight: 500, fontSize: 16 }}>Total Spent</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                <Button variant="outlined" size="small" sx={{ borderRadius: 999, fontWeight: 700 }} onClick={() => setShowSetBudget(true)}>Set budget</Button>
+                <Button variant="outlined" size="small" sx={{ borderRadius: 999, fontWeight: 700 }} disabled>Group balances</Button>
+              </Box>
+            </Paper>
+            <Paper sx={{ flex: 2, minWidth: 260, p: 3, borderRadius: 4, boxShadow: 2, display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center' }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
+                <Button variant="text" sx={{ fontWeight: 700, color: '#223a5f' }} disabled>View breakdown</Button>
+                <Button variant="text" sx={{ fontWeight: 700, color: '#223a5f' }} disabled>Add tripmate</Button>
+                <Button variant="text" sx={{ fontWeight: 700, color: '#223a5f' }} disabled>Settings</Button>
+              </Box>
+              {trip && trip.budget && (
+                <Typography sx={{ color: '#2563eb', fontWeight: 600, fontSize: 16 }}>Budget: ₹{trip.budget.toFixed(2)}</Typography>
+              )}
+            </Paper>
+          </Box>
+          {/* Expenses List Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Expenses</Typography>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Sort</InputLabel>
+              <Select
+                value={expenseSort}
+                label="Sort"
+                onChange={e => setExpenseSort(e.target.value)}
+              >
+                <MenuItem value="date_desc">Date (newest first)</MenuItem>
+                <MenuItem value="date_asc">Date (oldest first)</MenuItem>
+                <MenuItem value="amount_desc">Amount (high to low)</MenuItem>
+                <MenuItem value="amount_asc">Amount (low to high)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+          {/* Expenses List */}
           {budgetLoading ? (
             <Typography>Loading expenses...</Typography>
-          ) : budgetTabExpenses.length === 0 ? (
+          ) : sortedExpenses.length === 0 ? (
             <Typography>No expenses yet. Add your first expense!</Typography>
           ) : (
             <List>
-              {budgetTabExpenses.map(exp => (
+              {sortedExpenses.map(exp => (
                 <ListItem key={exp.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Box>
                     <Typography sx={{ fontWeight: 600 }}>₹{exp.amount.toFixed(2)} - {exp.category}</Typography>
@@ -1199,6 +1374,27 @@ function TripItineraryPage() {
               ))}
             </List>
           )}
+          {/* Set Budget Modal */}
+          <Dialog open={showSetBudget} onClose={() => setShowSetBudget(false)} maxWidth="xs" fullWidth>
+            <DialogTitle>Set Trip Budget</DialogTitle>
+            <DialogContent>
+              <TextField
+                label="Budget Amount"
+                type="number"
+                value={budgetInput}
+                onChange={e => setBudgetInput(e.target.value)}
+                fullWidth
+                InputProps={{ startAdornment: <AttachMoneyIcon sx={{ mr: 1 }} /> }}
+                sx={{ mt: 2 }}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setShowSetBudget(false)}>Cancel</Button>
+              <Button variant="contained" onClick={handleSetBudget} disabled={budgetSaving}>
+                {budgetSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogActions>
+          </Dialog>
           <BudgetModal
             open={budgetModalOpen || !!editExpense}
             onClose={() => { setBudgetModalOpen(false); setEditExpense(null); }}
@@ -1229,22 +1425,22 @@ function TripItineraryPage() {
               <Box sx={{ p: 3, pt: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: '#223a5f' }}>Menu</Typography>
                 <List>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
+                  <ListItem button selected={sidebarSelected === 'overview'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'overview' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('overview')}>
                     <ListItemText primary="Overview" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
+                  <ListItem button selected={sidebarSelected === 'explore'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'explore' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('explore')}>
                     <ListItemText primary="Explore" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
+                  <ListItem button selected={sidebarSelected === 'notes'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'notes' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('notes')}>
                     <ListItemText primary="Notes" />
                   </ListItem>
-                  <ListItem button sx={{ borderRadius: 2, mb: 1, fontWeight: 500 }} onClick={() => setShowDocuments(false)}>
+                  <ListItem button selected={sidebarSelected === 'places'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'places' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('places')}>
                     <ListItemText primary="Places to visit" />
                   </ListItem>
-                  <ListItem button selected={showDocuments} sx={{ borderRadius: 2, mb: 1, bgcolor: showDocuments ? '#eaf6fb' : undefined, fontWeight: showDocuments ? 700 : 500 }} onClick={() => setShowDocuments(true)}>
+                  <ListItem button selected={sidebarSelected === 'documents'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'documents' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('documents')}>
                     <ListItemText primary="View Documents" />
                   </ListItem>
-                  <ListItem button selected={!showDocuments} sx={{ borderRadius: 2, mb: 1, bgcolor: !showDocuments ? '#eaf6fb' : undefined, fontWeight: !showDocuments ? 700 : 500 }} onClick={() => setShowDocuments(false)}>
+                  <ListItem button selected={sidebarSelected === 'itinerary'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'itinerary' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('itinerary')}>
                     <ListItemText primary={`Itinerary for ${days[selectedDay]?.format('dddd, MMMM D') || ''}`} />
                   </ListItem>
                 </List>
@@ -1252,7 +1448,104 @@ function TripItineraryPage() {
             </Box>
             {/* Center: Itinerary Days as Cards or Documents */}
             <Box sx={{ flex: 1, px: { xs: 1, sm: 3 }, py: 3, maxWidth: 700, mx: 'auto' }}>
-              {showDocuments ? (
+              {sidebarSelected === 'overview' ? (
+                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: '#2563eb' }}>Itinerary Overview</Typography>
+                  {days.map((day, i) => (
+                    <Box key={i} sx={{ mb: 3 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#223a5f', mb: 1 }}>{day.format('dddd, MMMM D')}</Typography>
+                      {activitiesByDay[i].length === 0 ? (
+                        <Typography sx={{ color: '#bbb', fontSize: 15, mb: 1 }}>No activities planned.</Typography>
+                      ) : (
+                        <List>
+                          {activitiesByDay[i].map((act, idx) => (
+                            <ListItem key={act.id || idx} sx={{ bgcolor: '#f5faff', borderRadius: 2, mb: 1, boxShadow: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{act.title || act.name} {act.time && <span>({act.time})</span>}</Typography>
+                              <Typography variant="body2" sx={{ color: '#888' }}>{act.type} {act.location && `| ${act.location}`}</Typography>
+                              <Typography variant="body2">{act.notes || act.description}</Typography>
+                            </ListItem>
+                          ))}
+                        </List>
+                      )}
+                    </Box>
+                  ))}
+                </Paper>
+              ) : sidebarSelected === 'explore' ? (
+                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Explore</Typography>
+                  {/* Add your explore content here */}
+                </Paper>
+              ) : sidebarSelected === 'notes' ? (
+                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Notes</Typography>
+                  {/* Add your notes content here */}
+                </Paper>
+              ) : sidebarSelected === 'places' ? (
+                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>Places to visit</Typography>
+                    <IconButton size="small"><MoreVertIcon /></IconButton>
+                  </Box>
+                  {/* Add a place input */}
+                  <Autocomplete
+                    freeSolo
+                    options={placeOptions}
+                    loading={placeSearchLoading}
+                    getOptionLabel={option => option.display_name || ''}
+                    filterOptions={x => x}
+                    value={null}
+                    onChange={(_, value) => value && handleAddPlace(value)}
+                    inputValue={placeSearch}
+                    onInputChange={(_, value) => setPlaceSearch(value)}
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Add a place" variant="outlined" size="small" InputProps={{ ...params.InputProps, startAdornment: <span style={{ color: '#bbb', marginRight: 8 }}>📍</span> }} />
+                    )}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.place_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 8 }}>
+                        <span style={{ fontWeight: 600 }}>{option.display_name.split(',')[0]}</span>
+                        <span style={{ color: '#888', fontSize: 13 }}>{option.address?.state || ''}{option.address?.state && option.address?.country ? ', ' : ''}{option.address?.country || ''}</span>
+                      </li>
+                    )}
+                    sx={{ mb: 2, maxWidth: 480 }}
+                  />
+                  {/* Recommended places */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ color: '#888', mb: 1, fontWeight: 700 }}><KeyboardArrowDownIcon sx={{ fontSize: 18, mr: 1 }} />Recommended places</Typography>
+                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
+                      {recommendedPlaces.map((place, idx) => (
+                        <Box key={idx} sx={{ minWidth: 200, maxWidth: 220, bgcolor: '#f7f9fb', borderRadius: 3, boxShadow: 1, display: 'flex', alignItems: 'center', p: 1, pr: 2, border: '1.5px solid #e6eaf0', mr: 2 }}>
+                          <img src={place.photo} alt={place.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }} />
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{place.name}</Typography>
+                          </Box>
+                          <IconButton onClick={() => handleAddPlace(place)} sx={{ bgcolor: '#eaf6fb', ml: 1 }}><AddIcon /></IconButton>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                  {/* Saved places to visit */}
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle2" sx={{ color: '#888', mb: 1, fontWeight: 700 }}>Your places to visit</Typography>
+                  {placesLoading ? (
+                    <Typography sx={{ color: '#bbb', fontSize: 15, mt: 1 }}>Loading...</Typography>
+                  ) : placesToVisit.length === 0 ? (
+                    <Typography sx={{ color: '#bbb', fontSize: 15, mt: 1 }}>No places added yet.</Typography>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {placesToVisit.map(place => (
+                        <Box key={place.id} sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f7f9fb', borderRadius: 3, boxShadow: 1, p: 1.5, border: '1.5px solid #e6eaf0' }}>
+                          <img src={place.photoUrl} alt={place.name} style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', marginRight: 12 }} />
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{place.name}</Typography>
+                            <Typography sx={{ color: '#888', fontSize: 13 }}>{place.address?.state || ''}{place.address?.state && place.address?.country ? ', ' : ''}{place.address?.country || ''}</Typography>
+                          </Box>
+                          <IconButton onClick={() => handleRemovePlace(place.id)} sx={{ bgcolor: '#fff', ml: 1 }}><DeleteIcon /></IconButton>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
+              ) : sidebarSelected === 'documents' ? (
                 <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Documents</Typography>
                   <Box sx={{ mb: 2 }}>
@@ -1273,7 +1566,7 @@ function TripItineraryPage() {
                     )}
                   </List>
                 </Paper>
-              ) : days[selectedDay] && (
+              ) : (
                 <DayPlanCard
                   tripId={tripId}
                   day={days[selectedDay]}
@@ -1295,7 +1588,7 @@ function TripItineraryPage() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <Marker position={[parseFloat(trip.place.lat), parseFloat(trip.place.lon)]}>
+                  <Marker position={[parseFloat(trip.place.lat), parseFloat(trip.place.lon)]} icon={bigMarkerIcon}>
                     <Popup>{trip.place.display_name || 'Trip Location'}</Popup>
                   </Marker>
                 </MapContainer>
@@ -1573,7 +1866,15 @@ function MyTripsPage() {
       {joinedTrips.length > 0 && (
         <List sx={{ p: 0 }}>
           {joinedTrips.map(trip => (
-            <Box key={trip.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, p: 2, position: 'relative', border: '1.5px solid #e6eaf0' }}>
+            <Box
+              key={trip.id}
+              sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, p: 2, position: 'relative', border: '1.5px solid #e6eaf0', cursor: 'pointer', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: 4, background: '#f5faff' } }}
+              onClick={e => {
+                // Only trigger if not clicking an action button
+                if (e.target.closest('.trip-action-btn')) return;
+                navigate(`/trips/${trip.id}`);
+              }}
+            >
               <img
                 src={trip.photoUrl || fallbackImg}
                 alt={trip.name}
@@ -1593,8 +1894,7 @@ function MyTripsPage() {
                 </Box>
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <IconButton color="primary" onClick={() => navigate(`/trip/${trip.id}`)} title="View Details"><VisibilityIcon /></IconButton>
-                <IconButton color="info" onClick={() => navigate(`/trips/${trip.id}`)} title="Edit"><EditIcon /></IconButton>
+                <IconButton className="trip-action-btn" color="primary" onClick={e => { e.stopPropagation(); navigate(`/trip/${trip.id}`); }} title="View Details"><VisibilityIcon /></IconButton>
               </Box>
             </Box>
           ))}
@@ -1825,7 +2125,7 @@ const TripDetailsPage = () => {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 {coords[0] !== 20 && coords[1] !== 0 && (
-                  <Marker position={coords}>
+                  <Marker position={coords} icon={bigMarkerIcon}>
                     <Popup>{placeName || 'Trip Location'}</Popup>
                   </Marker>
                 )}
