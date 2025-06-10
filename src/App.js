@@ -33,6 +33,8 @@ import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import Autocomplete from '@mui/material/Autocomplete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
 function LandingPage() {
   const [user, setUser] = useState(null);
@@ -325,10 +327,11 @@ function TripCreateModal({ open, onClose, onCreated }) {
       else if (placeObj.address.country) query += ', ' + placeObj.address.country;
     }
     if (!query) query = placeName;
-    const UNSPLASH_ACCESS_KEY = '';
+    const UNSPLASH_ACCESS_KEY = 'Nk6iaf-mKBBI1Den__rwllLYFgdKqmoEuRaRMU3ixLsU';
     const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&client_id=${UNSPLASH_ACCESS_KEY}&orientation=landscape&per_page=1`;
     try {
       const res = await fetch(url);
+      if (res.status === 401) throw new Error('Unauthorized');
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         return data.results[0].urls.regular;
@@ -1184,7 +1187,7 @@ function TripItineraryPage() {
       ) : (
         <>
           {/* Day Navigation */}
-          <Box sx={{ display: 'flex', gap: 2, px: 4, py: 2, overflowX: 'auto', background: 'rgba(255,255,255,0.95)' }}>
+          <Box sx={{ display: 'flex', gap: 2, py: 2, overflowX: 'auto', background: 'rgba(255,255,255,0.95)' }}>
             {days.map((day, i) => (
               <Button key={i} variant={i === selectedDay ? 'contained' : 'outlined'} sx={{ borderRadius: 999, minWidth: 100, fontWeight: 700 }} onClick={() => setSelectedDay(i)}>
                 Day {i + 1}<br />{day.format('MMM D')}
@@ -1192,83 +1195,105 @@ function TripItineraryPage() {
             ))}
           </Box>
           {/* Main Content */}
-          <Box sx={{ display: 'flex', px: 4, py: 3, gap: 4 }}>
-            {/* Timeline/Activities */}
-            <Box sx={{ flex: 1, transition: 'margin-right 0.3s', marginRight: sidebarOpen ? 0 : 0 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Itinerary for {days[selectedDay]?.format('MMM D, YYYY')}</Typography>
-              <List>
-                {activitiesByDay[selectedDay]?.length ? activitiesByDay[selectedDay].map(act => (
-                  <ListItem key={act.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, cursor: 'pointer' }}
-                    onClick={() => setSelectedActivity(act)}
-                    secondaryAction={
-                      <IconButton edge="end" color="error" onClick={e => { e.stopPropagation(); handleDeleteActivity(act.id); }}>
-                        <DeleteIcon />
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: 'flex-start', gap: 4, px: 4, py: 3 }}>
+            {/* Main Content (Itinerary, etc.) */}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              {/* Timeline/Activities */}
+              <Box sx={{ transition: 'margin-right 0.3s', marginRight: 0 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Itinerary for {days[selectedDay]?.format('MMM D, YYYY')}</Typography>
+                <List>
+                  {activitiesByDay[selectedDay]?.length ? activitiesByDay[selectedDay].map(act => (
+                    <ListItem key={act.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, cursor: 'pointer' }}
+                      onClick={() => setSelectedActivity(act)}
+                      secondaryAction={
+                        <IconButton edge="end" color="error" onClick={e => { e.stopPropagation(); handleDeleteActivity(act.id); }}>
+                          <DeleteIcon />
+                        </IconButton>
+                      }
+                    >
+                      <ListItemText primary={dayjs(act.date).format('h:mm A') + ' - ' + act.title} secondary={act.type} />
+                      <IconButton edge="end" color="primary" onClick={e => { e.stopPropagation(); setEditActivity(act); }}>
+                        <EditIcon />
                       </IconButton>
-                    }
-                  >
-                    <ListItemText primary={dayjs(act.date).format('h:mm A') + ' - ' + act.title} secondary={act.type} />
-                    <IconButton edge="end" color="primary" onClick={e => { e.stopPropagation(); setEditActivity(act); }}>
-                      <EditIcon />
-                    </IconButton>
-                  </ListItem>
-                )) : <Typography sx={{ color: '#888', mt: 2 }}>No activities for this day.</Typography>}
-              </List>
-              <Button 
-                variant="outlined" 
-                startIcon={<AddIcon />} 
-                sx={{ borderRadius: 999, mt: 2 }}
-                onClick={() => setIsAddActivityModalOpen(true)}
-              >
-                Add Activity
-              </Button>
-            </Box>
-            {/* Sidebar for activity details */}
-            <Drawer
-              variant="persistent"
-              anchor="right"
-              open={sidebarOpen}
-              sx={{
-                width: sidebarOpen ? 340 : 0,
-                flexShrink: 0,
-                [`& .MuiDrawer-paper`]: {
-                  width: 340,
-                  boxSizing: 'border-box',
-                  borderLeft: '1px solid #e0e0e0',
-                  background: '#f8fafd',
-                  transition: 'width 0.3s',
-                  overflowX: 'hidden',
-                  ...(sidebarOpen ? {} : { width: 0, minWidth: 0, padding: 0, border: 'none' })
-                },
-              }}
-            >
-              <Toolbar sx={{ minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1 }}>
-                <IconButton onClick={() => setSidebarOpen(false)} size="small"><ChevronRightIcon /></IconButton>
-              </Toolbar>
-              <Box sx={{ p: 3, display: sidebarOpen ? 'block' : 'none' }}>
-                {selectedActivity ? (
-                  <>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{selectedActivity.title}</Typography>
-                    <Typography sx={{ color: '#2563eb', fontWeight: 600, mb: 1 }}>{selectedActivity.type}</Typography>
-                    <Typography sx={{ color: '#888', mb: 1 }}>{dayjs(selectedActivity.date).format('MMM D, YYYY, h:mm A')}</Typography>
-                    {selectedActivity.notes && <Typography sx={{ mb: 2 }}>{selectedActivity.notes}</Typography>}
-                    <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditActivity(selectedActivity)} sx={{ borderRadius: 999, mt: 2 }}>
-                      Edit Activity
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Activity Details</Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary">Select an activity to view or edit details here.</Typography>
-                  </>
-                )}
+                    </ListItem>
+                  )) : <Typography sx={{ color: '#888', mt: 2 }}>No activities for this day.</Typography>}
+                </List>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<AddIcon />} 
+                  sx={{ borderRadius: 999, mt: 2 }}
+                  onClick={() => setIsAddActivityModalOpen(true)}
+                >
+                  Add Activity
+                </Button>
               </Box>
-            </Drawer>
-            {/* Sidebar open button (when collapsed) */}
-            {!sidebarOpen && (
-              <IconButton onClick={() => setSidebarOpen(true)} sx={{ position: 'fixed', right: 8, top: 120, zIndex: 1201, bgcolor: '#fff', border: '1px solid #e0e0e0', boxShadow: 1 }}>
-                <ChevronLeftIcon />
-              </IconButton>
+              {/* Activity Details Drawer (unchanged) */}
+              <Drawer
+                variant="persistent"
+                anchor="right"
+                open={sidebarOpen}
+                sx={{
+                  width: sidebarOpen ? 340 : 0,
+                  flexShrink: 0,
+                  [`& .MuiDrawer-paper`]: {
+                    width: 340,
+                    boxSizing: 'border-box',
+                    borderLeft: '1px solid #e0e0e0',
+                    background: '#f8fafd',
+                    transition: 'width 0.3s',
+                    overflowX: 'hidden',
+                    ...(sidebarOpen ? {} : { width: 0, minWidth: 0, padding: 0, border: 'none' })
+                  },
+                }}
+              >
+                <Toolbar sx={{ minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1 }}>
+                  <IconButton onClick={() => setSidebarOpen(false)} size="small"><ChevronRightIcon /></IconButton>
+                </Toolbar>
+                <Box sx={{ p: 3, display: sidebarOpen ? 'block' : 'none' }}>
+                  {selectedActivity ? (
+                    <>
+                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{selectedActivity.title}</Typography>
+                      <Typography sx={{ color: '#2563eb', fontWeight: 600, mb: 1 }}>{selectedActivity.type}</Typography>
+                      <Typography sx={{ color: '#888', mb: 1 }}>{dayjs(selectedActivity.date).format('MMM D, YYYY, h:mm A')}</Typography>
+                      {selectedActivity.notes && <Typography sx={{ mb: 2 }}>{selectedActivity.notes}</Typography>}
+                      <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setEditActivity(selectedActivity)} sx={{ borderRadius: 999, mt: 2 }}>
+                        Edit Activity
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Activity Details</Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      <Typography variant="body1" color="text.secondary">Select an activity to view or edit details here.</Typography>
+                    </>
+                  )}
+                </Box>
+              </Drawer>
+              {!sidebarOpen && (
+                <IconButton onClick={() => setSidebarOpen(true)} sx={{ position: 'fixed', right: 8, top: 120, zIndex: 1201, bgcolor: '#fff', border: '1px solid #e0e0e0', boxShadow: 1 }}>
+                  <ChevronLeftIcon />
+                </IconButton>
+              )}
+            </Box>
+            {/* Sidebar Map */}
+            {trip && trip.place && trip.place.lat && trip.place.lon && (
+              <Paper sx={{ minWidth: 340, maxWidth: 400, minHeight: 340, borderRadius: 4, boxShadow: 3, p: 2, position: { md: 'sticky' }, top: 100, display: { xs: 'none', md: 'block' } }}>
+                <Typography variant="h6" sx={{ color: '#2563eb', mb: 1 }}>Trip Location</Typography>
+                <MapContainer
+                  center={[parseFloat(trip.place.lat), parseFloat(trip.place.lon)]}
+                  zoom={10}
+                  style={{ height: 300, width: '100%', borderRadius: 16, boxShadow: '0 4px 24px rgba(71,181,255,0.10)' }}
+                  scrollWheelZoom={true}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[parseFloat(trip.place.lat), parseFloat(trip.place.lon)]}>
+                    <Popup>{trip.place.display_name || 'Trip Location'}</Popup>
+                  </Marker>
+                </MapContainer>
+              </Paper>
             )}
           </Box>
         </>
@@ -1712,32 +1737,40 @@ const TripDetailsPage = () => {
     }
   };
 
+  // Get coordinates from trip.place if available
+  let coords = [20, 0]; // default world view
+  let placeName = '';
+  if (trip && trip.place && trip.place.lat && trip.place.lon) {
+    coords = [parseFloat(trip.place.lat), parseFloat(trip.place.lon)];
+    placeName = trip.place.display_name || '';
+  }
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
   if (!trip) return <div>Trip not found</div>;
 
   return (
     <Container maxWidth="md" sx={{ mt: 6, mb: 6 }}>
-      <Card sx={{ p: 4, mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#2563eb' }}>{trip.title}</Typography>
-        <Typography variant="subtitle1" sx={{ mb: 1 }}>Destination: <b>{trip.destination}</b></Typography>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>Start Date: {dayjs(trip.startDate).format('MMMM D, YYYY')}</Typography>
-        <Typography variant="subtitle2" sx={{ mb: 2 }}>End Date: {dayjs(trip.endDate).format('MMMM D, YYYY')}</Typography>
-        {editMode ? (
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-            <TextField label="Title" value={editedTrip.title} onChange={e => setEditedTrip({ ...editedTrip, title: e.target.value })} sx={{ minWidth: 180 }} />
-            <TextField label="Destination" value={editedTrip.destination} onChange={e => setEditedTrip({ ...editedTrip, destination: e.target.value })} sx={{ minWidth: 180 }} />
-            <TextField label="Start Date" type="date" value={editedTrip.startDate} onChange={e => setEditedTrip({ ...editedTrip, startDate: e.target.value })} sx={{ minWidth: 180 }} InputLabelProps={{ shrink: true }} />
-            <TextField label="End Date" type="date" value={editedTrip.endDate} onChange={e => setEditedTrip({ ...editedTrip, endDate: e.target.value })} sx={{ minWidth: 180 }} InputLabelProps={{ shrink: true }} />
-            <Button onClick={handleSaveTrip} variant="contained" sx={{ mt: 1 }}>Save</Button>
-            <Button onClick={() => setEditMode(false)} sx={{ mt: 1 }}>Cancel</Button>
-          </Box>
-        ) : (
-          <Button onClick={() => setEditMode(true)} variant="outlined" sx={{ mb: 2 }}>Edit Trip</Button>
-        )}
-      </Card>
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
+          <Card sx={{ p: 4, mb: 4 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#2563eb' }}>{trip.title}</Typography>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Destination: <b>{trip.destination}</b></Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Start Date: {dayjs(trip.startDate).format('MMMM D, YYYY')}</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 2 }}>End Date: {dayjs(trip.endDate).format('MMMM D, YYYY')}</Typography>
+            {editMode ? (
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                <TextField label="Title" value={editedTrip.title} onChange={e => setEditedTrip({ ...editedTrip, title: e.target.value })} sx={{ minWidth: 180 }} />
+                <TextField label="Destination" value={editedTrip.destination} onChange={e => setEditedTrip({ ...editedTrip, destination: e.target.value })} sx={{ minWidth: 180 }} />
+                <TextField label="Start Date" type="date" value={editedTrip.startDate} onChange={e => setEditedTrip({ ...editedTrip, startDate: e.target.value })} sx={{ minWidth: 180 }} InputLabelProps={{ shrink: true }} />
+                <TextField label="End Date" type="date" value={editedTrip.endDate} onChange={e => setEditedTrip({ ...editedTrip, endDate: e.target.value })} sx={{ minWidth: 180 }} InputLabelProps={{ shrink: true }} />
+                <Button onClick={handleSaveTrip} variant="contained" sx={{ mt: 1 }}>Save</Button>
+                <Button onClick={() => setEditMode(false)} sx={{ mt: 1 }}>Cancel</Button>
+              </Box>
+            ) : (
+              <Button onClick={() => setEditMode(true)} variant="outlined" sx={{ mb: 2 }}>Edit Trip</Button>
+            )}
+          </Card>
           <Paper sx={{ p: 3, mb: 2 }}>
             <Typography variant="h6" sx={{ color: '#2563eb', mb: 2 }}>Members</Typography>
             <List>
@@ -1748,8 +1781,6 @@ const TripDetailsPage = () => {
               ))}
             </List>
           </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3, mb: 2 }}>
             <Typography variant="h6" sx={{ color: '#2563eb', mb: 2 }}>Add New Activity</Typography>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
@@ -1759,8 +1790,6 @@ const TripDetailsPage = () => {
               <Button onClick={handleAddActivity} variant="contained">Add Activity</Button>
             </Box>
           </Paper>
-        </Grid>
-        <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ color: '#2563eb', mb: 2 }}>Activities</Typography>
             <List>
@@ -1778,6 +1807,24 @@ const TripDetailsPage = () => {
                 </ListItem>
               ))}
             </List>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, height: '100%', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+            <Typography variant="h6" sx={{ color: '#2563eb', mb: 2 }}>Trip Location</Typography>
+            <Box sx={{ flex: 1, minHeight: 340, borderRadius: 3, overflow: 'hidden', mt: 1 }}>
+              <MapContainer center={coords} zoom={coords[0] === 20 && coords[1] === 0 ? 2 : 10} style={{ height: 340, width: '100%', borderRadius: 16, boxShadow: '0 4px 24px rgba(71,181,255,0.10)' }} scrollWheelZoom={true}>
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {coords[0] !== 20 && coords[1] !== 0 && (
+                  <Marker position={coords}>
+                    <Popup>{placeName || 'Trip Location'}</Popup>
+                  </Marker>
+                )}
+              </MapContainer>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
