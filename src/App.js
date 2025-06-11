@@ -1504,28 +1504,31 @@ function TripItineraryPage() {
           />
         </Box>
       ) : tab === 2 ? (
-        <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', height: 500 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Live Chat</Typography>
-          <Box sx={{ flex: 1, overflowY: 'auto', mb: 2, bgcolor: '#f7f9fb', borderRadius: 2, p: 2, boxShadow: 1 }}>
-            {chatMessages.length === 0 ? (
-              <Typography sx={{ color: '#bbb', fontSize: 13 }}>No messages yet. Start the conversation!</Typography>
-            ) : (
-              chatMessages.map((msg, idx) => (
-                <ChatMessage key={msg.id || idx} msg={msg} />
-              ))
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              placeholder="Type a message..."
-              fullWidth
-              size="small"
-              onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
-              inputProps={{ style: { fontSize: 13 } }}
-            />
-            <Button variant="contained" onClick={handleSendChat} disabled={!chatInput.trim()} sx={{ fontSize: 13, minWidth: 60 }}>Send</Button>
+        <Box sx={{ p: 0, display: 'flex', flexDirection: 'row', height: 500, bgcolor: '#eaf6fb', borderRadius: 4, boxShadow: 2, overflow: 'hidden' }}>
+          <TeamMembersSidebar members={members} currentUserEmail={auth.currentUser?.email} />
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 0.5, bgcolor: '#f7f9fb' }}>
+              {chatMessages.length === 0 ? (
+                <Typography sx={{ color: '#bbb', fontSize: 13, textAlign: 'center', mt: 8 }}>No messages yet. Start the conversation!</Typography>
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <ChatMessage key={msg.id || idx} msg={msg} currentUserEmail={auth.currentUser?.email} />
+                ))
+              )}
+            </Box>
+            <Box sx={{ p: 2, borderTop: '1.5px solid #e0e0e0', bgcolor: '#fff', display: 'flex', gap: 1, alignItems: 'center', boxShadow: '0 -2px 8px rgba(71,181,255,0.04)' }}>
+              <TextField
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Type a message..."
+                fullWidth
+                size="small"
+                onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
+                inputProps={{ style: { fontSize: 15, borderRadius: 16 } }}
+                sx={{ bgcolor: '#f7f9fb', borderRadius: 999 }}
+              />
+              <Button variant="contained" onClick={handleSendChat} disabled={!chatInput.trim()} sx={{ fontSize: 15, minWidth: 60, borderRadius: 999, boxShadow: 0 }}>Send</Button>
+            </Box>
           </Box>
         </Box>
       ) : (
@@ -2725,7 +2728,7 @@ function DayPlanCard({ tripId, day, userId }) {
 }
 
 // Add ChatMessage component above TripItineraryPage
-function ChatMessage({ msg }) {
+function ChatMessage({ msg, currentUserEmail }) {
   const [name, setName] = React.useState(userNameCache[msg.sender] || '');
   React.useEffect(() => {
     if (!name) {
@@ -2733,16 +2736,53 @@ function ChatMessage({ msg }) {
     }
   }, [msg.sender, name]);
   const color = getUserColor(msg.sender);
-
+  const isMe = msg.sender === currentUserEmail;
+  const initials = (name ? name[0] : (msg.sender?.split('@')[0][0] || 'U')).toUpperCase();
   return (
-    <Box sx={{ mb: 1, p: 1, bgcolor: '#fff', borderRadius: 2, boxShadow: 0.5, display: 'flex', alignItems: 'center', fontSize: 13, minHeight: 32 }}>
-      <span style={{ fontWeight: 700, color, marginRight: 8, fontSize: 13, minWidth: 60, textTransform: 'capitalize' }}>
-        {name || msg.sender?.split('@')[0] || 'User'}:
-      </span>
-      <span style={{ flex: 1, fontSize: 13, color: '#222', wordBreak: 'break-word', marginRight: 8 }}>{msg.text}</span>
-      <span style={{ color: '#888', fontSize: 11, marginLeft: 'auto', minWidth: 90, textAlign: 'right' }}>
-        {msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleString() : ''}
-      </span>
+    <Box sx={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 1.5, mb: 0.5 }}>
+      <Avatar sx={{ bgcolor: color, width: 32, height: 32, fontWeight: 700, fontSize: 15 }}>{initials}</Avatar>
+      <Box sx={{ maxWidth: '70%', minWidth: 60, display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.2 }}>
+          <Typography sx={{ fontWeight: 700, color: color, fontSize: 13, textTransform: 'capitalize' }}>{name || msg.sender?.split('@')[0] || 'User'}</Typography>
+          <Typography sx={{ color: '#888', fontSize: 11 }}>{msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</Typography>
+        </Box>
+        <Box sx={{
+          bgcolor: isMe ? '#2563eb' : '#fff',
+          color: isMe ? '#fff' : '#222',
+          borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          p: 1.2,
+          px: 2,
+          fontSize: 15,
+          boxShadow: isMe ? '0 2px 8px rgba(37,99,235,0.08)' : '0 2px 8px rgba(71,181,255,0.06)',
+          mt: 0.2,
+          wordBreak: 'break-word',
+          minWidth: 40,
+        }}>
+          {msg.text}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// Add TeamMembersSidebar above TripItineraryPage
+function TeamMembersSidebar({ members, currentUserEmail }) {
+  return (
+    <Box sx={{ width: 220, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', height: 500, p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 2, color: '#223a5f', letterSpacing: 0.5 }}>Team Members</Typography>
+      {members.map((m, idx) => {
+        const color = getUserColor(m.email || m.id);
+        const initials = (m.firstName ? m.firstName[0] : (m.email || m.id)[0] || '').toUpperCase();
+        return (
+          <Box key={m.id || idx} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, p: 1, borderRadius: 2, bgcolor: (m.email === currentUserEmail) ? '#e0f7fa' : 'transparent' }}>
+            <Avatar sx={{ bgcolor: color, width: 36, height: 36, fontWeight: 700, fontSize: 18 }}>{initials}</Avatar>
+            <Box>
+              <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#223a5f', textTransform: 'capitalize' }}>{m.firstName || m.email?.split('@')[0] || m.id}</Typography>
+              <Typography sx={{ color: '#888', fontSize: 12 }}>{m.email}</Typography>
+            </Box>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
