@@ -60,10 +60,13 @@ const CHAT_USER_COLORS = [
 const userNameCache = {};
 
 // Helper to get color for a user
-function getUserColor(sender) {
-  if (!sender) return CHAT_USER_COLORS[0];
+function getUserColor(user) {
+  // user can be an object or a string (email/uid)
+  const key = typeof user === 'object'
+    ? (user.uid || user.email || user.id)
+    : user;
   let hash = 0;
-  for (let i = 0; i < sender.length; i++) hash = sender.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
   return CHAT_USER_COLORS[Math.abs(hash) % CHAT_USER_COLORS.length];
 }
 
@@ -90,6 +93,24 @@ async function getUserFirstName(sender) {
   }
   userNameCache[sender] = firstName;
   return firstName;
+}
+
+// Helper to get display name from user details or fallback to email
+async function getDisplayName(user) {
+  let uid = user.uid || user.id || null;
+  let email = user.email || (typeof user === 'string' ? user : null);
+  if (uid) {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (data.firstName || data.lastName) {
+          return `${data.firstName || ''} ${data.lastName || ''}`.trim();
+        }
+      }
+    } catch {}
+  }
+  return email || 'User';
 }
 
 function LandingPage() {
@@ -2825,17 +2846,28 @@ function ChatMessage({ msg, currentUserEmail }) {
 
 // Add TeamMembersSidebar above TripItineraryPage
 function TeamMembersSidebar({ members, currentUserEmail }) {
+  const [displayNames, setDisplayNames] = React.useState({});
+  React.useEffect(() => {
+    async function fetchNames() {
+      const names = {};
+      for (const m of members) {
+        names[m.id] = await getDisplayName(m);
+      }
+      setDisplayNames(names);
+    }
+    fetchNames();
+  }, [members]);
   return (
     <Box sx={{ width: 220, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', height: 500, p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 2, color: '#223a5f', letterSpacing: 0.5 }}>Team Members</Typography>
       {members.map((m, idx) => {
-        const color = getUserColor(m.email || m.id);
-        const initials = (m.firstName ? m.firstName[0] : (m.email || m.id)[0] || '').toUpperCase();
+        const color = getUserColor(m);
+        const initials = (displayNames[m.id] ? displayNames[m.id][0] : (m.email || m.id)[0] || '').toUpperCase();
         return (
           <Box key={m.id || idx} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, p: 1, borderRadius: 2, bgcolor: (m.email === currentUserEmail) ? '#e0f7fa' : 'transparent' }}>
             <Avatar sx={{ bgcolor: color, width: 36, height: 36, fontWeight: 700, fontSize: 18 }}>{initials}</Avatar>
             <Box>
-              <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#223a5f', textTransform: 'capitalize' }}>{m.firstName || m.email?.split('@')[0] || m.id}</Typography>
+              <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#223a5f', textTransform: 'capitalize' }}>{displayNames[m.id] || m.email?.split('@')[0] || m.id}</Typography>
               <Typography sx={{ color: '#888', fontSize: 12 }}>{m.email}</Typography>
             </Box>
           </Box>
