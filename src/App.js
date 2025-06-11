@@ -43,6 +43,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import ChatIcon from '@mui/icons-material/Chat';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 
 // Custom big marker icon
 const bigMarkerIcon = L.icon({
@@ -1329,6 +1330,26 @@ function TripItineraryPage() {
                     <Button size="small" variant="outlined" onClick={e => handleRoleMenuOpen(e, m)} sx={{ textTransform: 'none', minWidth: 90 }}>{m.role}</Button>
                     <IconButton color="error" onClick={() => handleRemoveMember(m)} title="Remove Member">
                       <DeleteIcon />
+                    </IconButton>
+                    {/* New: Delete Collaborator Button */}
+                    <IconButton color="error" onClick={async () => {
+                      if (!window.confirm(`Remove ${m.email || m.id} from this trip?`)) return;
+                      try {
+                        const tripRef = doc(db, 'trips', tripId);
+                        const updatedMembers = { ...trip.members };
+                        delete updatedMembers[m.id];
+                        await updateDoc(tripRef, { members: updatedMembers });
+                        // Only try to update user doc if m.id looks like a UID (not an email)
+                        if (m.id && !m.id.includes('@')) {
+                          await updateDoc(doc(db, 'users', m.id), {
+                            tripIds: arrayRemove(tripId)
+                          });
+                        }
+                      } catch (err) {
+                        alert('Error removing collaborator: ' + err.message);
+                      }
+                    }} title="Delete Collaborator">
+                      <RemoveCircleOutlineIcon />
                     </IconButton>
                   </Box>
                 )}
