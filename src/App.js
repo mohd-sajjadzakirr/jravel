@@ -52,6 +52,45 @@ const bigMarkerIcon = L.icon({
   popupAnchor: [0, -48],
 });
 
+// Add at the top of the file, after imports
+const CHAT_USER_COLORS = [
+  '#2563eb', '#ff715b', '#22c55e', '#f59e42', '#a855f7', '#eab308', '#14b8a6', '#ef4444', '#6366f1', '#f43f5e', '#0ea5e9', '#fbbf24', '#10b981', '#f472b6', '#8b5cf6', '#facc15', '#4ade80', '#f87171', '#60a5fa', '#fcd34d'
+];
+const userNameCache = {};
+
+// Helper to get color for a user
+function getUserColor(sender) {
+  if (!sender) return CHAT_USER_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < sender.length; i++) hash = sender.charCodeAt(i) + ((hash << 5) - hash);
+  return CHAT_USER_COLORS[Math.abs(hash) % CHAT_USER_COLORS.length];
+}
+
+// Helper to get first name for a sender (email or UID)
+async function getUserFirstName(sender) {
+  if (!sender) return 'User';
+  if (userNameCache[sender]) return userNameCache[sender];
+  // Try to find by email (sender is email)
+  let firstName = '';
+  try {
+    // Try to find user by email (users collection, email field)
+    const usersCol = collection(db, 'users');
+    const q = query(usersCol, where('email', '==', sender));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const data = snap.docs[0].data();
+      firstName = data.firstName || sender.split('@')[0];
+    } else {
+      // fallback: just use the part before @
+      firstName = sender.split('@')[0];
+    }
+  } catch {
+    firstName = sender.split('@')[0];
+  }
+  userNameCache[sender] = firstName;
+  return firstName;
+}
+
 function LandingPage() {
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('');
@@ -1469,14 +1508,10 @@ function TripItineraryPage() {
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Live Chat</Typography>
           <Box sx={{ flex: 1, overflowY: 'auto', mb: 2, bgcolor: '#f7f9fb', borderRadius: 2, p: 2, boxShadow: 1 }}>
             {chatMessages.length === 0 ? (
-              <Typography sx={{ color: '#bbb' }}>No messages yet. Start the conversation!</Typography>
+              <Typography sx={{ color: '#bbb', fontSize: 13 }}>No messages yet. Start the conversation!</Typography>
             ) : (
-              chatMessages.map(msg => (
-                <Box key={msg.id} sx={{ mb: 2, p: 1.5, bgcolor: '#fff', borderRadius: 2, boxShadow: 0.5 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{msg.sender}</Typography>
-                  <Typography sx={{ fontSize: 16 }}>{msg.text}</Typography>
-                  <Typography sx={{ color: '#888', fontSize: 12 }}>{msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleString() : ''}</Typography>
-                </Box>
+              chatMessages.map((msg, idx) => (
+                <ChatMessage key={msg.id || idx} msg={msg} />
               ))
             )}
           </Box>
@@ -1488,8 +1523,9 @@ function TripItineraryPage() {
               fullWidth
               size="small"
               onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }}
+              inputProps={{ style: { fontSize: 13 } }}
             />
-            <Button variant="contained" onClick={handleSendChat} disabled={!chatInput.trim()}>Send</Button>
+            <Button variant="contained" onClick={handleSendChat} disabled={!chatInput.trim()} sx={{ fontSize: 13, minWidth: 60 }}>Send</Button>
           </Box>
         </Box>
       ) : (
@@ -2685,6 +2721,29 @@ function DayPlanCard({ tripId, day, userId }) {
       </Button>
       {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
     </Paper>
+  );
+}
+
+// Add ChatMessage component above TripItineraryPage
+function ChatMessage({ msg }) {
+  const [name, setName] = React.useState(userNameCache[msg.sender] || '');
+  React.useEffect(() => {
+    if (!name) {
+      getUserFirstName(msg.sender).then(setName);
+    }
+  }, [msg.sender, name]);
+  const color = getUserColor(msg.sender);
+
+  return (
+    <Box sx={{ mb: 1, p: 1, bgcolor: '#fff', borderRadius: 2, boxShadow: 0.5, display: 'flex', alignItems: 'center', fontSize: 13, minHeight: 32 }}>
+      <span style={{ fontWeight: 700, color, marginRight: 8, fontSize: 13, minWidth: 60, textTransform: 'capitalize' }}>
+        {name || msg.sender?.split('@')[0] || 'User'}:
+      </span>
+      <span style={{ flex: 1, fontSize: 13, color: '#222', wordBreak: 'break-word', marginRight: 8 }}>{msg.text}</span>
+      <span style={{ color: '#888', fontSize: 11, marginLeft: 'auto', minWidth: 90, textAlign: 'right' }}>
+        {msg.createdAt?.seconds ? new Date(msg.createdAt.seconds * 1000).toLocaleString() : ''}
+      </span>
+    </Box>
   );
 }
 
