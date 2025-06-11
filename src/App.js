@@ -128,8 +128,15 @@ function LandingPage() {
       <header className="hero">
         <div className="hero-content">
           <h5 className="hero-tag">BEST DESTINATIONS AROUND THE WORLD</h5>
-          <h1 className="hero-title">
-            Travel, <span className="highlight">enjoy</span> and live a new and full life
+          <h1 className="hero-title" style={{
+            fontWeight: 800,
+            fontSize: '2.7rem',
+            color: '#223a5f',
+            marginBottom: 18,
+            letterSpacing: '0.5px',
+            lineHeight: 1.18,
+          }}>
+            It's not just travel, it's a journey with <span style={{color:'#ff715b'}}>Jravel</span>.
           </h1>
           <p className="hero-desc">
             Built Wicket longer admire do barton vanity itself do in it. Preferred to sportsmen it engrossed listening. Park gate sell they west hard for the.
