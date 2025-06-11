@@ -1504,9 +1504,10 @@ function TripItineraryPage() {
           />
         </Box>
       ) : tab === 2 ? (
-        <Box sx={{ p: 0, display: 'flex', flexDirection: 'row', height: 500, bgcolor: '#eaf6fb', borderRadius: 4, boxShadow: 2, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', height: '100vh', minHeight: '100vh', bgcolor: '#eaf6fb', borderRadius: 0, boxShadow: 0, overflow: 'hidden' }}>
           <TeamMembersSidebar members={members} currentUserEmail={auth.currentUser?.email} />
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', minHeight: '100vh' }}>
+            {/* Optional: Chat header can go here */}
             <Box sx={{ flex: 1, overflowY: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 0.5, bgcolor: '#f7f9fb' }}>
               {chatMessages.length === 0 ? (
                 <Typography sx={{ color: '#bbb', fontSize: 13, textAlign: 'center', mt: 8 }}>No messages yet. Start the conversation!</Typography>
@@ -1516,7 +1517,7 @@ function TripItineraryPage() {
                 ))
               )}
             </Box>
-            <Box sx={{ p: 2, borderTop: '1.5px solid #e0e0e0', bgcolor: '#fff', display: 'flex', gap: 1, alignItems: 'center', boxShadow: '0 -2px 8px rgba(71,181,255,0.04)' }}>
+            <Box sx={{ p: 2, borderTop: '1.5px solid #e0e0e0', bgcolor: '#fff', display: 'flex', gap: 1, alignItems: 'center', boxShadow: '0 -2px 8px rgba(71,181,255,0.04)', borderRadius: 0 }}>
               <TextField
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
