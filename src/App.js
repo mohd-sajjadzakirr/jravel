@@ -44,6 +44,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import ChatIcon from '@mui/icons-material/Chat';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 
 // Custom big marker icon
 const bigMarkerIcon = L.icon({
@@ -911,6 +912,10 @@ function TripItineraryPage() {
   const [overviewDocuments, setOverviewDocuments] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  const [editDateOpen, setEditDateOpen] = useState(false);
+  const [editStartDate, setEditStartDate] = useState(trip?.startDate || '');
+  const [editEndDate, setEditEndDate] = useState(trip?.endDate || '');
+  const [savingDates, setSavingDates] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1309,7 +1314,7 @@ function TripItineraryPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#2563eb', mr: 2 }}>{trip.name}</Typography>
             <Typography variant="body1" sx={{ color: '#888', mr: 2 }}>{dayjs(trip.startDate).format('MMM D, YYYY')} - {dayjs(trip.endDate).format('MMM D, YYYY')}</Typography>
-            <IconButton color="primary"><EditIcon /></IconButton>
+            <IconButton color="primary" onClick={() => { setEditStartDate(trip.startDate); setEditEndDate(trip.endDate); setEditDateOpen(true); }}><EditIcon /></IconButton>
             <Avatar sx={{ bgcolor: '#47b5ff', ml: 2 }}>U</Avatar>
           </Box>
         </Toolbar>
@@ -1877,6 +1882,51 @@ function TripItineraryPage() {
           )}
         </DialogContent>
       </Dialog>
+      {/* Edit Dates Dialog */}
+      <Dialog open={editDateOpen} onClose={() => setEditDateOpen(false)}>
+        <DialogTitle>Edit Trip Dates</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={editStartDate}
+              onChange={e => setEditStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={editEndDate}
+              onChange={e => setEditEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDateOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={savingDates}
+            onClick={async () => {
+              setSavingDates(true);
+              try {
+                await updateDoc(doc(db, 'trips', tripId), {
+                  startDate: editStartDate,
+                  endDate: editEndDate,
+                });
+                setEditDateOpen(false);
+              } catch (err) {
+                alert('Error updating dates: ' + err.message);
+              } finally {
+                setSavingDates(false);
+              }
+            }}
+          >
+            {savingDates ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -2063,6 +2113,30 @@ function MyTripsPage() {
     }
   };
 
+  // In MyTripsPage, add a leave trip handler
+  const handleLeaveTrip = async (tripId) => {
+    if (!window.confirm('Are you sure you want to leave this trip?')) return;
+    try {
+      // Remove user from trip's members
+      const tripRef = doc(db, 'trips', tripId);
+      const tripSnap = await getDoc(tripRef);
+      if (tripSnap.exists()) {
+        const tripData = tripSnap.data();
+        const updatedMembers = { ...tripData.members };
+        delete updatedMembers[user.uid];
+        await updateDoc(tripRef, { members: updatedMembers });
+      }
+      // Remove tripId from user's tripIds array
+      await updateDoc(doc(db, 'users', user.uid), {
+        tripIds: arrayRemove(tripId)
+      });
+      // Optionally, refresh trips
+      setJoinedTrips(joinedTrips.filter(t => t.id !== tripId));
+    } catch (err) {
+      alert('Error leaving trip: ' + err.message);
+    }
+  };
+
   if (!user) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h6">Please log in to view your trips.</Typography></Box>;
   if (loading) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography>Loading trips...</Typography></Box>;
   if (error) return <Box sx={{ p: 8, textAlign: 'center' }}><Typography color="error">{error}</Typography></Box>;
@@ -2211,6 +2285,7 @@ function MyTripsPage() {
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <IconButton className="trip-action-btn" color="primary" onClick={e => { e.stopPropagation(); navigate(`/trip/${trip.id}`); }} title="View Details"><VisibilityIcon /></IconButton>
+                <IconButton className="trip-action-btn" color="error" onClick={e => { e.stopPropagation(); handleLeaveTrip(trip.id); }} title="Leave Trip"><ExitToAppIcon /></IconButton>
               </Box>
             </Box>
           ))}
