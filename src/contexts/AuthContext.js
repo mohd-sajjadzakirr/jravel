@@ -1,9 +1,37 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { db } from '../firebase';
+import { collection, getDocs, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
+
+async function claimEmailInvites(user) {
+  if (!user || !user.email) return;
+  const tripsSnap = await getDocs(collection(db, 'trips'));
+  const userEmail = user.email.toLowerCase();
+  for (const tripDoc of tripsSnap.docs) {
+    const trip = tripDoc.data();
+    if (trip.members) {
+      for (const [key, member] of Object.entries(trip.members)) {
+        if (member.email && member.email.toLowerCase() === userEmail) {
+          // Add UID to members
+          await updateDoc(doc(db, 'trips', tripDoc.id), {
+            [`members.${user.uid}`]: {
+              ...member,
+              email: user.email
+            }
+          });
+          // Add tripId to user's tripIds
+          await updateDoc(doc(db, 'users', user.uid), {
+            tripIds: arrayUnion(tripDoc.id)
+          });
+        }
+      }
+    }
+  }
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -11,9 +39,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
+      if (user) {
+        await claimEmailInvites(user);
+      }
     });
 
     return () => unsubscribe();

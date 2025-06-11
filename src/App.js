@@ -21,7 +21,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CloseIcon from '@mui/icons-material/Close';
-import { updateDoc } from 'firebase/firestore';
+import { updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { setDoc } from 'firebase/firestore';
 import Menu from '@mui/material/Menu';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -419,6 +419,10 @@ function TripCreateModal({ open, onClose, onCreated }) {
         members: {
           [user.uid]: { role: 'admin', email: user.email }
         }
+      });
+      // AUTOMATION: Add tripId to user's tripIds array
+      await updateDoc(doc(db, 'users', user.uid), {
+        tripIds: arrayUnion(docRef.id)
       });
       setDestination('');
       setSelectedPlace(null);
@@ -1029,6 +1033,22 @@ function TripItineraryPage() {
       const updatedMembers = { ...trip.members };
       delete updatedMembers[member.id];
       await updateDoc(tripRef, { members: updatedMembers });
+      // AUTOMATION: Remove tripId from user's tripIds array
+      // Try to get userId from member.id (if it's a UID) or fetch by email
+      let userDocId = member.id;
+      if (member.email && member.id !== member.email) {
+        // If member.id is not an email, assume it's a UID
+        userDocId = member.id;
+      } else if (member.email) {
+        // If member.id is an email, try to find the user by email
+        // (Assumes you have a way to map email to UID, otherwise skip this step)
+        // You may want to implement a lookup here if needed
+      }
+      if (userDocId) {
+        await updateDoc(doc(db, 'users', userDocId), {
+          tripIds: arrayRemove(tripId)
+        });
+      }
     } catch (err) {
       alert('Error removing member: ' + err.message);
     }
@@ -1849,40 +1869,45 @@ function MyTripsPage() {
     if (!user) return;
     setError('');
     setLoading(true);
-    try {
-      const tripsCol = collection(db, 'trips');
-      // Listen to all trips where the user is a member
-      const unsub = onSnapshot(tripsCol, (snap) => {
-        const allTrips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const emailKey = user.email.replace(/\./g, '_').toLowerCase();
+    (async () => {
+      try {
+        // 1. Get the user's tripIds array
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const tripIds = userDoc.exists() ? userDoc.data().tripIds || [] : [];
+        if (!tripIds.length) {
+          setCreatedTrips([]);
+          setJoinedTrips([]);
+          setLoading(false);
+          return;
+        }
+        // 2. Query only those trips
+        // Firestore 'in' queries are limited to 10 items per query
+        const chunkSize = 10;
+        let allTrips = [];
+        for (let i = 0; i < tripIds.length; i += chunkSize) {
+          const chunk = tripIds.slice(i, i + chunkSize);
+          const tripsQ = query(collection(db, 'trips'), where('__name__', 'in', chunk));
+          const tripsSnap = await getDocs(tripsQ);
+          allTrips = allTrips.concat(tripsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        // Separate created and joined trips
         const created = [];
         const joined = [];
         allTrips.forEach(trip => {
           if (trip.createdBy === user.uid) {
             created.push(trip);
-          } else if (trip.members) {
-            // Normalize all keys to lowercase for comparison
-            const memberKeys = Object.keys(trip.members).map(k => k.toLowerCase());
-            if (memberKeys.includes(emailKey)) {
-              joined.push(trip);
-            }
+          } else {
+            joined.push(trip);
           }
         });
         setCreatedTrips(created);
         setJoinedTrips(joined);
         setLoading(false);
-        console.log('User:', user);
-        console.log('Created Trips:', created);
-        console.log('Joined Trips:', joined);
-      }, (err) => {
+      } catch (err) {
         setError('Error loading trips: ' + err.message);
         setLoading(false);
-      });
-      return () => unsub();
-    } catch (err) {
-      setError('Query error: ' + err.message);
-      setLoading(false);
-    }
+      }
+    })();
   }, [user]);
 
   const handleDelete = async (tripId) => {
@@ -1922,10 +1947,14 @@ function MyTripsPage() {
         return;
       }
       const tripId = invite.tripId;
-      // Add user to trip members
+      // Add user to trip members (KEYED BY UID, ONLY update members field)
       const tripRef = doc(db, 'trips', tripId);
       await updateDoc(tripRef, {
-        [`members.${user.email.replace(/\./g, '_').toLowerCase()}`]: { role: 'contributor', email: user.email, joinedViaCode: joinCode }
+        [`members.${user.uid}`]: { role: 'contributor', email: user.email, joinedViaCode: joinCode }
+      });
+      // AUTOMATION: Add tripId to user's tripIds array
+      await updateDoc(doc(db, 'users', user.uid), {
+        tripIds: arrayUnion(tripId)
       });
       // Mark invite as used
       await updateDoc(inviteDoc.ref, { used: true, usedBy: user.email, usedAt: new Date() });
