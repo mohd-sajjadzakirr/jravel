@@ -1335,6 +1335,25 @@ function TripItineraryPage() {
     setRemarkInputs((prev) => ({ ...prev, [section]: '' }));
   };
 
+  // Helper: add remark (new function)
+  const handleAddRemark = async (section) => {
+    if (!remarkInputs[section]?.trim()) return;
+    
+    try {
+      const remark = {
+        text: remarkInputs[section].trim(),
+        createdBy: auth.currentUser?.email || 'Anonymous',
+        createdAt: serverTimestamp(),
+        section: section
+      };
+
+      await addDoc(collection(db, 'trips', tripId, 'remarks'), remark);
+      setRemarkInputs(prev => ({ ...prev, [section]: '' }));
+    } catch (error) {
+      console.error('Error adding remark:', error);
+    }
+  };
+
   // Mouse event handlers for resizing
   const handleMouseDown = (e) => {
     setIsResizing(true);
@@ -1385,9 +1404,9 @@ function TripItineraryPage() {
       </Tabs>
       {/* Tab Content */}
       {tab === 3 ? (
-        <Box sx={{ display: 'flex', height: '70vh', minHeight: 400, bgcolor: '#fff', borderRadius: 4, boxShadow: 1, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', height: '100vh', bgcolor: '#fff', borderRadius: 4, boxShadow: 1, overflow: 'hidden' }}>
           {/* Sidebar ... now resizable ... */}
-          <Box sx={{ width: sidebarWidth, minWidth: 180, maxWidth: 500, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Box sx={{ width: sidebarWidth, minWidth: 180, maxWidth: 500, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', p: 0, display: 'flex', flexDirection: 'column', height: '100vh' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, pb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Collaborators</Typography>
               {isAdmin && (
@@ -1445,7 +1464,7 @@ function TripItineraryPage() {
             onMouseDown={handleMouseDown}
           />
           {/* Main content: Special Remarks */}
-          <Box sx={{ flex: 1, bgcolor: '#fff', p: 4, overflowY: 'auto' }}>
+          <Box sx={{ flex: 1, bgcolor: '#fff', p: 4, overflowY: 'auto', height: '100vh' }}>
             <Typography variant="h5" sx={{ color: '#2563eb', fontWeight: 700, mb: 2 }}>Special Remarks</Typography>
             {Object.keys(groupedRemarks).length === 0 ? (
               <Typography sx={{ color: '#888', mt: 2 }}>No remarks yet.</Typography>
@@ -1713,12 +1732,11 @@ function TripItineraryPage() {
                   <ListItem button selected={sidebarSelected === 'overview'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'overview' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('overview')}>
                     <ListItemText primary="Overview" />
                   </ListItem>
-                  <ListItem button selected={sidebarSelected === 'explore'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'explore' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('explore')}>
-                    <ListItemText primary="Explore" />
-                  </ListItem>
-                  <ListItem button selected={sidebarSelected === 'notes'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'notes' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('notes')}>
-                    <ListItemText primary="Notes" />
-                  </ListItem>
+                  {!isAdmin && (
+                    <ListItem button selected={sidebarSelected === 'remarks'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'remarks' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('remarks')}>
+                      <ListItemText primary="Remarks" />
+                    </ListItem>
+                  )}
                   <ListItem button selected={sidebarSelected === 'places'} sx={{ borderRadius: 2, mb: 1, fontWeight: 500, bgcolor: sidebarSelected === 'places' ? '#eaf6fb' : undefined }} onClick={() => setSidebarSelected('places')}>
                     <ListItemText primary="Places to visit" />
                   </ListItem>
@@ -1793,16 +1811,6 @@ function TripItineraryPage() {
                       </List>
                     </Box>
                   )}
-                </Paper>
-              ) : sidebarSelected === 'explore' ? (
-                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Explore</Typography>
-                  {/* Add your explore content here */}
-                </Paper>
-              ) : sidebarSelected === 'notes' ? (
-                <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Notes</Typography>
-                  {/* Add your notes content here */}
                 </Paper>
               ) : sidebarSelected === 'places' ? (
                 <Paper sx={{ p: 3, borderRadius: 4, boxShadow: 2, bgcolor: '#fff' }}>
@@ -1915,6 +1923,80 @@ function TripItineraryPage() {
                     )}
                   </List>
                 </Paper>
+              ) : sidebarSelected === 'remarks' ? (
+                <Paper sx={{ width: '100%', maxWidth: 700, borderRadius: 4, boxShadow: 2, bgcolor: '#fff', p: 3, mx: 'auto' }}>
+                  <Typography variant="h5" sx={{ color: '#2563eb', fontWeight: 700, mb: 2 }}>Special Remarks</Typography>
+                  {/* Places to Visit Remark */}
+                  <Paper sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, bgcolor: '#f7f9fb' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 1 }}>Places to Visit</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <TextField
+                        placeholder="Write your remark about places to visit..."
+                        value={remarkInputs['places'] || ''}
+                        onChange={e => setRemarkInputs(prev => ({ ...prev, ['places']: e.target.value }))}
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        sx={{ bgcolor: '#fff' }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={() => handleAddRemark('places')}
+                        disabled={!remarkInputs['places']?.trim()}
+                        sx={{ borderRadius: 2, minWidth: 100 }}
+                      >
+                        Add
+                      </Button>
+                    </Box>
+                  </Paper>
+                  {/* Day Remarks */}
+                  {days.map((day, i) => (
+                    <Paper key={i} sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, bgcolor: '#f7f9fb' }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 1 }}>Day {i + 1} - {day.format('dddd, MMMM D')}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TextField
+                          placeholder={`Write your remark for Day ${i + 1}...`}
+                          value={remarkInputs[day.format('YYYY-MM-DD')] || ''}
+                          onChange={e => setRemarkInputs(prev => ({ ...prev, [day.format('YYYY-MM-DD')]: e.target.value }))}
+                          size="small"
+                          fullWidth
+                          multiline
+                          rows={2}
+                          sx={{ bgcolor: '#fff' }}
+                        />
+                        <Button
+                          variant="contained"
+                          onClick={() => handleAddRemark(day.format('YYYY-MM-DD'))}
+                          disabled={!remarkInputs[day.format('YYYY-MM-DD')]?.trim()}
+                          sx={{ borderRadius: 2, minWidth: 100 }}
+                        >
+                          Add
+                        </Button>
+                      </Box>
+                    </Paper>
+                  ))}
+                  {/* Display existing remarks */}
+                  {Object.keys(groupedRemarks).length > 0 && (
+                    <Box sx={{ mt: 4 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Previous Remarks</Typography>
+                      {Object.entries(groupedRemarks).map(([section, remarksArr]) => (
+                        <Paper key={section} sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, bgcolor: '#f7f9fb' }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 1 }}>
+                            {section === 'places' ? 'Places to Visit' :
+                              section.match(/^\d{4}-\d{2}-\d{2}$/) ? `Day ${days.findIndex(d => d.format('YYYY-MM-DD') === section) + 1} - ${dayjs(section).format('dddd, MMMM D')}` : section}
+                          </Typography>
+                          {remarksArr.map((r, idx) => (
+                            <Box key={r.id || idx} sx={{ mb: 1.5, pl: 1, borderLeft: '3px solid #47b5ff', wordBreak: 'break-word' }}>
+                              <Typography sx={{ fontSize: 15, color: '#223a5f', fontWeight: 600 }}>{r.text}</Typography>
+                              <Typography sx={{ fontSize: 13, color: '#888' }}>by {r.createdBy} {r.createdAt?.seconds ? `on ${dayjs(r.createdAt.seconds * 1000).format('MMM D, YYYY h:mm A')}` : ''}</Typography>
+                            </Box>
+                          ))}
+                        </Paper>
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
               ) : (
                 <DayPlanCard
                   tripId={tripId}
@@ -2009,6 +2091,14 @@ function TripItineraryPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      {tab === 0 && !isAdmin && (
+        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 3 }}>
+          {/* Removed old Special Remarks section */}
+        </Box>
+      )}
+      {sidebarSelected === 'remarks' && !isAdmin && (
+        <></> // Already rendered in main content area, so render nothing here
+      )}
     </Box>
   );
 }
