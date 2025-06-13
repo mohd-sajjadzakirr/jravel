@@ -166,9 +166,15 @@ function LandingPage() {
           </p>
           <div className="hero-cta">
             <button className="find-btn">Find out more</button>
-            <button className="demo-btn">
+            <a
+              className="demo-btn"
+              href="https://youtu.be/D_Yaajod-og"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+            >
               <span className="play-icon">▶</span> Play Demo
-            </button>
+            </a>
           </div>
         </div>
         <img className="hero-img" src="https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg" alt="Traveler" />
@@ -208,27 +214,27 @@ function LandingPage() {
         <h2 className="section-title">Top Destinations</h2>
         <div className="destination-cards">
           <div className="destination-card">
-            <img src="https://images.pexels.com/photos/3601422/pexels-photo-3601422.jpeg" alt="Rome" />
+            <img src="https://images.pexels.com/photos/1051075/pexels-photo-1051075.jpeg" alt="Goa" />
             <div className="dest-info">
-              <h4>Rome, Italy</h4>
-              <p>$5.4k</p>
-              <span>10 Days Trip</span>
+              <h4>Goa, India</h4>
+              <p>₹15,000</p>
+              <span>7 Days Trip</span>
             </div>
           </div>
           <div className="destination-card">
-            <img src="https://images.pexels.com/photos/3601421/pexels-photo-3601421.jpeg" alt="London" />
+            <img src="https://images.pexels.com/photos/674010/pexels-photo-674010.jpeg" alt="Jaipur" />
             <div className="dest-info">
-              <h4>London, UK</h4>
-              <p>$4.2k</p>
-              <span>12 Days Trip</span>
+              <h4>Jaipur, Rajasthan</h4>
+              <p>₹12,000</p>
+              <span>5 Days Trip</span>
             </div>
           </div>
           <div className="destination-card">
-            <img src="https://images.pexels.com/photos/3601420/pexels-photo-3601420.jpeg" alt="Europe" />
+            <img src="https://images.pexels.com/photos/417173/pexels-photo-417173.jpeg" alt="Kerala" />
             <div className="dest-info">
-              <h4>Full Europe</h4>
-              <p>$15k</p>
-              <span>28 Days Trip</span>
+              <h4>Kerala, India</h4>
+              <p>₹18,000</p>
+              <span>8 Days Trip</span>
             </div>
           </div>
         </div>
@@ -282,26 +288,14 @@ function LandingPage() {
         <h2 className="section-title">What people say about Us.</h2>
         <div className="testimonials-carousel">
           <div className="testimonial-card">
-            <img className="testimonial-avatar" src="https://randomuser.me/api/portraits/men/32.jpg" alt="Mike Taylor" />
-            <p>"On the Windows talking painted pasture yet its express parties use. Sure last upon he same as knew next. Of believed or diverted no."</p>
-            <h4>Mike Taylor</h4>
-            <span>Lahore, Pakistan</span>
+            <p>"Jravel made planning my family trip so easy! The itinerary builder and group chat features are a game changer. Highly recommended for anyone who loves to travel hassle-free."</p>
+            <h4>Mohd Sajjad Zakir</h4>
           </div>
           <div className="testimonial-card">
-            <img className="testimonial-avatar" src="https://randomuser.me/api/portraits/men/44.jpg" alt="Chris Thomas" />
-            <p>"On the Windows talking painted pasture yet its express parties use. Sure last upon he same as knew next. Of believed or diverted no."</p>
-            <h4>Chris Thomas</h4>
-            <span>CEO of Red Button</span>
+            <p>"I found the best destinations and managed my travel budget all in one place. The platform is super intuitive and the support team is very responsive. Will use again!"</p>
+            <h4>Akshat Singh Parmar</h4>
           </div>
         </div>
-      </section>
-
-      {/* Partners */}
-      <section className="partners">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2d/Expedia_Logo.svg" alt="Expedia" />
-        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/Qantas_Airways_Logo_2016.svg" alt="Qantas" />
-        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2d/Jetstar_Logo.svg" alt="Jetstar" />
-        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/Alitalia_Logo.svg" alt="Alitalia" />
       </section>
 
       {/* Newsletter */}
@@ -507,6 +501,10 @@ function TripCreateModal({ open, onClose, onCreated }) {
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ flex: 1, padding: '12px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: '1rem' }} placeholder="Start date" />
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ flex: 1, padding: '12px 12px', borderRadius: 10, border: '1px solid #e0e0e0', fontSize: '1rem' }} placeholder="End date" />
           </div>
+        </div>
+        {/* Invite friends heading */}
+        <div style={{ marginTop: 2, marginBottom: 2 }}>
+          <span style={{ fontWeight: 600, color: '#223a5f', fontSize: 15 }}>Invite friends <span style={{ color: '#888', fontWeight: 400 }}>(optional)</span></span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <TextField
@@ -1329,66 +1327,45 @@ function TripItineraryPage() {
       </Tabs>
       {/* Tab Content */}
       {tab === 3 ? (
-        <Box sx={{ p: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Collaborators</Typography>
-            {isAdmin && (
-              <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => setInviteOpen(true)}>
-                Invite Member
-              </Button>
-            )}
-          </Box>
-          <List>
-            {members.length === 0 ? (
-              <Typography>No collaborators yet.</Typography>
-            ) : members.map(m => (
-              <ListItem key={m.id} sx={{ bgcolor: '#fff', borderRadius: 3, mb: 2, boxShadow: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {/* Avatar: show initials or fallback */}
-                  <Avatar sx={{ bgcolor: '#47b5ff' }}>{m.email ? m.email[0].toUpperCase() : m.id[0].toUpperCase()}</Avatar>
+        <Box sx={{ display: 'flex', height: '70vh', minHeight: 400, bgcolor: '#fff', borderRadius: 4, boxShadow: 1, overflow: 'hidden' }}>
+          {/* Sidebar */}
+          <Box sx={{ width: 300, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, pb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Collaborators</Typography>
+              {isAdmin && (
+                <Button variant="outlined" size="small" startIcon={<PersonAddIcon />} onClick={() => setInviteOpen(true)} sx={{ borderRadius: 2, fontWeight: 600, fontSize: 14, ml: 1 }}>
+                  Invite
+                </Button>
+              )}
+            </Box>
+            <Box sx={{ flex: 1, overflowY: 'auto', px: 2, pb: 2 }}>
+              {members.length === 0 ? (
+                <Typography sx={{ color: '#888', mt: 2 }}>No collaborators yet.</Typography>
+              ) : members.map(m => (
+                <Box key={m.id} sx={{
+                  display: 'flex', alignItems: 'center', gap: 2, mb: 1.5, p: 1.5, borderRadius: 3,
+                  bgcolor: m.id === currentUserId ? '#e0f7fa' : '#fff',
+                  boxShadow: m.id === currentUserId ? 2 : 0,
+                  border: m.id === currentUserId ? '1.5px solid #47b5ff' : '1.5px solid #e6eaf0',
+                  cursor: 'pointer',
+                }}>
+                  <Avatar sx={{ bgcolor: '#47b5ff', width: 40, height: 40, fontWeight: 700, fontSize: 20 }}>{(m.email ? m.email[0] : m.id[0]).toUpperCase()}</Avatar>
                   <Box>
-                    <Typography sx={{ fontWeight: 600 }}>{m.email || m.id}</Typography>
-                    <Typography sx={{ color: '#888', fontSize: 14 }}>{m.role}</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{m.email || m.id}</Typography>
+                    <Typography sx={{ color: '#888', fontSize: 13 }}>{m.role}</Typography>
                   </Box>
                 </Box>
-                {isAdmin && m.id !== currentUserId && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Button size="small" variant="outlined" onClick={e => handleRoleMenuOpen(e, m)} sx={{ textTransform: 'none', minWidth: 90 }}>{m.role}</Button>
-                    <IconButton color="error" onClick={() => handleRemoveMember(m)} title="Remove Member">
-                      <DeleteIcon />
-                    </IconButton>
-                    {/* New: Delete Collaborator Button */}
-                    <IconButton color="error" onClick={async () => {
-                      if (!window.confirm(`Remove ${m.email || m.id} from this trip?`)) return;
-                      try {
-                        const tripRef = doc(db, 'trips', tripId);
-                        const updatedMembers = { ...trip.members };
-                        delete updatedMembers[m.id];
-                        await updateDoc(tripRef, { members: updatedMembers });
-                        // Only try to update user doc if m.id looks like a UID (not an email)
-                        if (m.id && !m.id.includes('@')) {
-                          await updateDoc(doc(db, 'users', m.id), {
-                            tripIds: arrayRemove(tripId)
-                          });
-                        }
-                      } catch (err) {
-                        alert('Error removing collaborator: ' + err.message);
-                      }
-                    }} title="Delete Collaborator">
-                      <RemoveCircleOutlineIcon />
-                    </IconButton>
-                  </Box>
-                )}
-              </ListItem>
-            ))}
-          </List>
-          {/* Role Menu */}
+              ))}
+            </Box>
+          </Box>
+          {/* Main area (empty for now) */}
+          <Box sx={{ flex: 1, bgcolor: '#fff' }} />
+          {/* Invite Modal and Role Menu remain unchanged below */}
           <Menu anchorEl={roleMenuAnchor} open={Boolean(roleMenuAnchor)} onClose={handleRoleMenuClose}>
             <MenuItem onClick={() => handleChangeRole('admin')}>Admin</MenuItem>
             <MenuItem onClick={() => handleChangeRole('contributor')}>Contributor</MenuItem>
             <MenuItem onClick={() => handleChangeRole('viewer')}>Viewer</MenuItem>
           </Menu>
-          {/* Invite Modal */}
           <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} maxWidth="xs" fullWidth>
             <DialogTitle>Invite Member</DialogTitle>
             <IconButton onClick={() => setInviteOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
@@ -1438,7 +1415,6 @@ function TripItineraryPage() {
               )}
             </DialogActions>
           </Dialog>
-          {/* Invite Success Dialog */}
           <Dialog open={!!inviteSuccessCode} onClose={() => setInviteSuccessCode(null)} maxWidth="xs" fullWidth>
             <DialogTitle>Invite Code Generated</DialogTitle>
             <DialogContent>
@@ -1452,7 +1428,7 @@ function TripItineraryPage() {
                 <Button
                   variant="outlined"
                   color="primary"
-                  href={`mailto:?subject=Jravel Trip Invite&body=Join my trip "${trip?.name || ''}" on Jravel! Use this code: ${inviteSuccessCode}`}
+                  href={`mailto:?subject=Jravel Trip Invite&body=Join my trip \"${trip?.name || ''}\" on Jravel! Use this code: ${inviteSuccessCode}`}
                   target="_blank"
                 >
                   Share via Email
@@ -1460,7 +1436,7 @@ function TripItineraryPage() {
                 <Button
                   variant="outlined"
                   color="success"
-                  href={`https://wa.me/?text=Join my trip "${trip?.name || ''}" on Jravel! Use this code: ${inviteSuccessCode}`}
+                  href={`https://wa.me/?text=Join my trip \"${trip?.name || ''}\" on Jravel! Use this code: ${inviteSuccessCode}`}
                   target="_blank"
                 >
                   Share via WhatsApp
