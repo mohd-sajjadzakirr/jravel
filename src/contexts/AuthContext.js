@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { db } from '../firebase';
-import { collection, getDocs, updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, arrayUnion, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -43,6 +43,18 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setLoading(false);
       if (user) {
+        // Ensure user doc exists
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            email: user.email,
+            firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+            lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+            tripIds: [],
+            createdAt: new Date(),
+          });
+        }
         await claimEmailInvites(user);
       }
     });

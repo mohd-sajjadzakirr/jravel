@@ -914,6 +914,12 @@ function TripItineraryPage() {
   const [editStartDate, setEditStartDate] = useState(trip?.startDate || '');
   const [editEndDate, setEditEndDate] = useState(trip?.endDate || '');
   const [savingDates, setSavingDates] = useState(false);
+  // Add at the top of TripItineraryPage
+  const [remarks, setRemarks] = useState([]);
+  const [remarkInputs, setRemarkInputs] = useState({});
+  // Add at the top of TripItineraryPage
+  const [sidebarWidth, setSidebarWidth] = useState(340); // default width set to 340px
+  const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1299,6 +1305,58 @@ function TripItineraryPage() {
     setChatInput('');
   };
 
+  // Fetch remarks for this trip
+  useEffect(() => {
+    if (!tripId) return;
+    const q = query(collection(db, 'trips', tripId, 'remarks'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setRemarks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, [tripId]);
+
+  // Helper: grouped remarks by section
+  const groupedRemarks = remarks.reduce((acc, r) => {
+    if (!acc[r.section]) acc[r.section] = [];
+    acc[r.section].push(r);
+    return acc;
+  }, {});
+
+  // Helper: send remark
+  const handleSendRemark = async (section) => {
+    const text = remarkInputs[section]?.trim();
+    if (!text) return;
+    await addDoc(collection(db, 'trips', tripId, 'remarks'), {
+      text,
+      section,
+      createdBy: auth.currentUser?.email || 'Anonymous',
+      createdAt: new Date(),
+    });
+    setRemarkInputs((prev) => ({ ...prev, [section]: '' }));
+  };
+
+  // Mouse event handlers for resizing
+  const handleMouseDown = (e) => {
+    setIsResizing(true);
+  };
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e) => {
+      const min = 180, max = 500;
+      let newWidth = e.clientX - 60; // 60px for sidebar margin/padding
+      if (newWidth < min) newWidth = min;
+      if (newWidth > max) newWidth = max;
+      setSidebarWidth(newWidth);
+    };
+    const handleMouseUp = () => setIsResizing(false);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
   if (!trip) {
     return <Box sx={{ p: 8, textAlign: 'center' }}><Typography variant="h5">Loading trip...</Typography></Box>;
   }
@@ -1328,8 +1386,8 @@ function TripItineraryPage() {
       {/* Tab Content */}
       {tab === 3 ? (
         <Box sx={{ display: 'flex', height: '70vh', minHeight: 400, bgcolor: '#fff', borderRadius: 4, boxShadow: 1, overflow: 'hidden' }}>
-          {/* Sidebar */}
-          <Box sx={{ width: 300, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Sidebar ... now resizable ... */}
+          <Box sx={{ width: sidebarWidth, minWidth: 180, maxWidth: 500, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, pb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Collaborators</Typography>
               {isAdmin && (
@@ -1348,18 +1406,66 @@ function TripItineraryPage() {
                   boxShadow: m.id === currentUserId ? 2 : 0,
                   border: m.id === currentUserId ? '1.5px solid #47b5ff' : '1.5px solid #e6eaf0',
                   cursor: 'pointer',
+                  justifyContent: 'space-between'
                 }}>
-                  <Avatar sx={{ bgcolor: '#47b5ff', width: 40, height: 40, fontWeight: 700, fontSize: 20 }}>{(m.email ? m.email[0] : m.id[0]).toUpperCase()}</Avatar>
-                  <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{m.email || m.id}</Typography>
-                    <Typography sx={{ color: '#888', fontSize: 13 }}>{m.role}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ bgcolor: '#47b5ff', width: 40, height: 40, fontWeight: 700, fontSize: 20 }}>{(m.email ? m.email[0] : m.id[0]).toUpperCase()}</Avatar>
+                    <Box>
+                      <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{m.email || m.id}</Typography>
+                      <Typography sx={{ color: '#888', fontSize: 13 }}>{m.role}</Typography>
+                    </Box>
                   </Box>
+                  {isAdmin && m.id !== currentUserId && (
+                    <IconButton color="error" onClick={async () => {
+                      if (!window.confirm(`Remove ${m.email || m.id} from this trip?`)) return;
+                      try {
+                        const tripRef = doc(db, 'trips', tripId);
+                        const updatedMembers = { ...trip.members };
+                        delete updatedMembers[m.id];
+                        await updateDoc(tripRef, { members: updatedMembers });
+                        if (m.id && !m.id.includes('@')) {
+                          await updateDoc(doc(db, 'users', m.id), {
+                            tripIds: arrayRemove(tripId)
+                          });
+                        }
+                      } catch (err) {
+                        alert('Error removing collaborator: ' + err.message);
+                      }
+                    }} title="Delete Collaborator">
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
                 </Box>
               ))}
             </Box>
           </Box>
-          {/* Main area (empty for now) */}
-          <Box sx={{ flex: 1, bgcolor: '#fff' }} />
+          {/* Draggable divider */}
+          <Box
+            sx={{ width: 8, cursor: 'col-resize', bgcolor: isResizing ? '#47b5ff' : 'transparent', zIndex: 2 }}
+            onMouseDown={handleMouseDown}
+          />
+          {/* Main content: Special Remarks */}
+          <Box sx={{ flex: 1, bgcolor: '#fff', p: 4, overflowY: 'auto' }}>
+            <Typography variant="h5" sx={{ color: '#2563eb', fontWeight: 700, mb: 2 }}>Special Remarks</Typography>
+            {Object.keys(groupedRemarks).length === 0 ? (
+              <Typography sx={{ color: '#888', mt: 2 }}>No remarks yet.</Typography>
+            ) : (
+              Object.entries(groupedRemarks).map(([section, remarksArr]) => (
+                <Paper key={section} sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, maxWidth: 500, minWidth: 220, overflowX: 'auto' }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 1 }}>
+                    {section === 'places' ? 'Places to Visit' :
+                      section.match(/^\d{4}-\d{2}-\d{2}$/) ? `Itinerary for ${dayjs(section).format('dddd, MMMM D')}` : section}
+                  </Typography>
+                  {remarksArr.map((r, idx) => (
+                    <Box key={r.id || idx} sx={{ mb: 1.5, pl: 1, borderLeft: '3px solid #47b5ff', wordBreak: 'break-word' }}>
+                      <Typography sx={{ fontSize: 15, color: '#223a5f', fontWeight: 600 }}>{r.text}</Typography>
+                      <Typography sx={{ fontSize: 13, color: '#888' }}>by {r.createdBy} {r.createdAt?.seconds ? `on ${dayjs(r.createdAt.seconds * 1000).format('MMM D, YYYY h:mm A')}` : ''}</Typography>
+                    </Box>
+                  ))}
+                </Paper>
+              ))
+            )}
+          </Box>
           {/* Invite Modal and Role Menu remain unchanged below */}
           <Menu anchorEl={roleMenuAnchor} open={Boolean(roleMenuAnchor)} onClose={handleRoleMenuClose}>
             <MenuItem onClick={() => handleChangeRole('admin')}>Admin</MenuItem>
