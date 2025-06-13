@@ -261,4 +261,101 @@
 .train-platform {
   color: #495057;
   font-size: 0.98rem;
+}
+
+/* --- FLIGHT RESULTS --- */
+.flight-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.flight-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(71,181,255,0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 0;
+  border: 1.5px solid #e6eaf0;
+  padding: 0;
+}
+.flight-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 32px rgba(71,181,255,0.18);
+}
+.flight-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 18px 18px 18px;
+  flex: 1;
+}
+.flight-airline {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #223a5f;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.flight-airline-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #f0f4f8;
+  border: 1px solid #e0e0e0;
+}
+.flight-route {
+  color: #47b5ff;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+.flight-time {
+  color: #888;
+  font-size: 0.98rem;
+  margin-bottom: 2px;
+}
+.flight-price {
+  color: #47b5ff;
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.flight-card .hotel-book-btn {
+  margin-top: 0;
+  background: linear-gradient(90deg, #4CA1AF 0%, #47b5ff 100%);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(71,181,255,0.10);
+  width: 100%;
+}
+.flight-card .hotel-book-btn:hover {
+  background: linear-gradient(90deg, #2563eb 0%, #4CA1AF 100%);
+}
+
+/* --- FLIGHT SEARCH FORM --- */
+.main-search-form {
+  margin-bottom: 0;
+}
+.main-search-row {
+  gap: 18px;
+}
+@media (max-width: 900px) {
+  .flight-results {
+    grid-template-columns: 1fr;
+  }
 } 

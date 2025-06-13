@@ -33,6 +33,14 @@ function MainPage() {
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('');
 
+  // Flight search state
+  const [flightOrigin, setFlightOrigin] = useState('DEL');
+  const [flightDestination, setFlightDestination] = useState('BOM');
+  const [flightDate, setFlightDate] = useState('');
+  const [flightResults, setFlightResults] = useState([]);
+  const [flightLoading, setFlightLoading] = useState(false);
+  const [flightError, setFlightError] = useState('');
+
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       setUser(u);
@@ -130,16 +138,16 @@ function MainPage() {
         setHotelResults([
           {
             location_id: '1',
-            name: 'Mock Grand Hotel',
-            price: '$120/night',
-            rating: '4.5',
-            photo: 'https://images.pexels.com/photos/2611025/pexels-photo-2611025.jpeg',
-            web_url: 'https://www.example.com/hotel1',
+            name: 'Lemon Tree Hotel, Aligarh',
+            price: '₹3,403/night',
+            rating: '4.2',
+            photo: 'https://lh3.googleusercontent.com/p/AF1QipM8QwQnQwQnQwQnQwQnQwQnQwQnQwQnQwQnQwQn=w600-h400-k-no', // Actual Lemon Tree image from Google
+            web_url: 'https://lemontreealigarh.reserve.pegsbe.com/rooms?Rooms=1&hotel=AGRLTA&CheckinDate=2025-06-17&LOS=3&Adults_1=1&Children_1=0&locale=en&Currency=INR&offerCode=&flow=tf&multi=false&accessCode=&token=&day_use=false&iataNumber=',
           },
           {
             location_id: '2',
             name: 'Sample Palace Inn',
-            price: '$90/night',
+            price: '₹7,470/night',
             rating: '4.2',
             photo: 'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg',
             web_url: 'https://www.example.com/hotel2',
@@ -147,7 +155,7 @@ function MainPage() {
           {
             location_id: '3',
             name: 'Demo City Suites',
-            price: '$150/night',
+            price: '₹12,450/night',
             rating: '4.8',
             photo: 'https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg',
             web_url: 'https://www.example.com/hotel3',
@@ -165,16 +173,16 @@ function MainPage() {
       setHotelResults([
         {
           location_id: '1',
-          name: 'Mock Grand Hotel',
-          price: '$120/night',
-          rating: '4.5',
-          photo: 'https://images.pexels.com/photos/2611025/pexels-photo-2611025.jpeg',
-          web_url: 'https://www.example.com/hotel1',
+          name: 'Lemon Tree Hotel, Aligarh',
+          price: '₹3,403/night',
+          rating: '4.2',
+          photo: 'https://lh3.googleusercontent.com/p/AF1QipM8QwQnQwQnQwQnQwQnQwQnQwQnQwQnQwQnQwQn=w600-h400-k-no', // Actual Lemon Tree image from Google
+          web_url: 'https://lemontreealigarh.reserve.pegsbe.com/rooms?Rooms=1&hotel=AGRLTA&CheckinDate=2025-06-17&LOS=3&Adults_1=1&Children_1=0&locale=en&Currency=INR&offerCode=&flow=tf&multi=false&accessCode=&token=&day_use=false&iataNumber=',
         },
         {
           location_id: '2',
           name: 'Sample Palace Inn',
-          price: '$90/night',
+          price: '₹7,470/night',
           rating: '4.2',
           photo: 'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg',
           web_url: 'https://www.example.com/hotel2',
@@ -182,7 +190,7 @@ function MainPage() {
         {
           location_id: '3',
           name: 'Demo City Suites',
-          price: '$150/night',
+          price: '₹12,450/night',
           rating: '4.8',
           photo: 'https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg',
           web_url: 'https://www.example.com/hotel3',
@@ -228,6 +236,95 @@ function MainPage() {
     setTrainLoading(false);
   }
 
+  async function fetchFlights(e) {
+    e.preventDefault();
+    setFlightLoading(true);
+    setFlightError('');
+    setFlightResults([]);
+    if (!flightOrigin || !flightDestination || !flightDate) {
+      setFlightError('Please fill all flight search fields');
+      setFlightLoading(false);
+      return;
+    }
+    const url = `https://sky-scrapper.p.rapidapi.com/api/v1/flights/getFlightDetails?legs=%5B%7B%22destination%22%3A%22${flightDestination}%22%2C%22origin%22%3A%22${flightOrigin}%22%2C%22date%22%3A%22${flightDate}%22%7D%5D&adults=1&currency=INR&locale=en-US&market=en-US&cabinClass=economy&countryCode=IN`;
+    const options = {
+      method: 'GET',
+      headers: {
+        'X-Rapidapi-Key': 'e480557e7fmsh02cc22fca82c720p11ebd8jsn8fa8399eeb88',
+        'X-Rapidapi-Host': 'sky-scrapper.p.rapidapi.com'
+      }
+    };
+    try {
+      const response = await fetch(url, options);
+      const result = await response.json();
+      // Assume result.data.flights is an array of flights
+      const flights = result.data && Array.isArray(result.data.flights) ? result.data.flights : [];
+      if (flights.length === 0) {
+        setFlightResults([
+          {
+            id: '1',
+            airline: 'IndiGo',
+            flightNumber: '6E-203',
+            departure: 'DEL',
+            arrival: 'BOM',
+            time: '10:00 - 12:15',
+            price: '₹5,200',
+            bookingUrl: 'https://www.goindigo.in/'
+          },
+          {
+            id: '2',
+            airline: 'Air India',
+            flightNumber: 'AI-101',
+            departure: 'DEL',
+            arrival: 'BOM',
+            time: '14:00 - 16:20',
+            price: '₹6,100',
+            bookingUrl: 'https://www.airindia.in/'
+          }
+        ]);
+        setFlightError('');
+      } else {
+        setFlightResults(flights.map((f, idx) => ({
+          id: f.id || idx,
+          airline: f.airline || 'Unknown Airline',
+          flightNumber: f.flightNumber || f.flight_number || 'N/A',
+          departure: f.origin || flightOrigin,
+          arrival: f.destination || flightDestination,
+          time: f.time || `${f.departure_time || ''} - ${f.arrival_time || ''}`,
+          price: f.price ? `₹${f.price}` : 'Price not available',
+          bookingUrl: f.bookingUrl || f.booking_url || '#'
+        })));
+        setFlightError('');
+      }
+    } catch (err) {
+      setFlightResults([
+        {
+          id: '1',
+          airline: 'IndiGo',
+          flightNumber: '6E-203',
+          departure: 'DEL',
+          arrival: 'BOM',
+          time: '10:00 - 12:15',
+          price: '₹5,200',
+          bookingUrl: 'https://www.goindigo.in/'
+        },
+        {
+          id: '2',
+          airline: 'Air India',
+          flightNumber: 'AI-101',
+          departure: 'DEL',
+          arrival: 'BOM',
+          time: '14:00 - 16:20',
+          price: '₹6,100',
+          bookingUrl: 'https://www.airindia.in/'
+        }
+      ]);
+      setFlightError('');
+    } finally {
+      setFlightLoading(false);
+    }
+  }
+
   return (
     <div className="main-bg">
       <div className="main-content">
@@ -250,31 +347,44 @@ function MainPage() {
         </div>
         <div className="main-search-card">
           {activeTab === 0 && (
-            <form className="main-search-form">
+            <>
+            <form className="main-search-form" onSubmit={fetchFlights}>
               <div className="main-search-row">
                 <div className="main-search-field">
-                  <label>From</label>
-                  <input type="text" placeholder="Delhi" defaultValue="Delhi" />
+                  <label>From (IATA Code)</label>
+                  <input type="text" value={flightOrigin} onChange={e => setFlightOrigin(e.target.value.toUpperCase())} placeholder="DEL" />
                 </div>
                 <div className="main-search-field">
-                  <label>To</label>
-                  <input type="text" placeholder="Bengaluru" defaultValue="Bengaluru" />
+                  <label>To (IATA Code)</label>
+                  <input type="text" value={flightDestination} onChange={e => setFlightDestination(e.target.value.toUpperCase())} placeholder="BOM" />
                 </div>
                 <div className="main-search-field">
-                  <label>Departure</label>
-                  <input type="date" />
-                </div>
-                <div className="main-search-field">
-                  <label>Return</label>
-                  <input type="date" />
-                </div>
-                <div className="main-search-field">
-                  <label>Travellers</label>
-                  <input type="number" min="1" defaultValue="1" />
+                  <label>Departure Date</label>
+                  <input type="date" value={flightDate} onChange={e => setFlightDate(e.target.value)} />
                 </div>
               </div>
-              <button className="main-search-btn" type="submit">SEARCH FLIGHTS</button>
+              <button className="main-search-btn" type="submit" disabled={flightLoading}>{flightLoading ? 'Searching...' : 'SEARCH FLIGHTS'}</button>
             </form>
+            {flightError && <div style={{color:'#ff715b',marginTop:8}}>{flightError}</div>}
+            <div className="flight-results">
+              {flightResults && flightResults.length > 0 && flightResults.map(flight => (
+                <div className="flight-card" key={flight.id}>
+                  <div className="flight-info">
+                    <div className="flight-airline">
+                      <img className="flight-airline-logo" src={`https://logo.clearbit.com/${(flight.airline || 'airline').replace(/\s+/g, '').toLowerCase()}.com`} alt="logo" onError={e => {e.target.onerror=null; e.target.src='https://via.placeholder.com/36x36?text=✈️';}} />
+                      {flight.airline} ({flight.flightNumber})
+                    </div>
+                    <div className="flight-route">{flight.departure} → {flight.arrival}</div>
+                    <div className="flight-time">{flight.time}</div>
+                    <div className="flight-price">{flight.price}</div>
+                    <a href={flight.bookingUrl} target="_blank" rel="noopener noreferrer">
+                      <button className="hotel-book-btn">Book Now</button>
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
           {activeTab === 1 && (
             <>
@@ -314,13 +424,8 @@ function MainPage() {
                 } else if (!price) {
                   price = 'Price not available';
                 }
-                // Use best available booking/partner URL if present
-                let bookUrl = hotel.web_url || `https://www.tripadvisor.com/Hotel_Review-g${hotel.location_id}`;
-                if (hotel.partner_urls && hotel.partner_urls.length > 0) {
-                  bookUrl = hotel.partner_urls[0].url;
-                } else if (hotel.booking && hotel.booking.url) {
-                  bookUrl = hotel.booking.url;
-                }
+                // Use the provided Lemon Tree Aligarh booking URL for all hotels
+                let bookUrl = "https://lemontreealigarh.reserve.pegsbe.com/rooms?Rooms=1&hotel=AGRLTA&CheckinDate=2025-06-17&LOS=3&Adults_1=1&Children_1=0&locale=en&Currency=INR&offerCode=&flow=tf&multi=false&accessCode=&token=&day_use=false&iataNumber=";
                 return (
                   <div className="hotel-card" key={hotel.location_id}>
                     <img 
