@@ -45,6 +45,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import ChatIcon from '@mui/icons-material/Chat';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import AITripPlanner from './pages/AITripPlanner';
 
 // Custom big marker icon
 const bigMarkerIcon = L.icon({
@@ -601,7 +602,9 @@ function ItineraryBuilderPage() {
           <span style={{ fontSize: 48, marginBottom: 18 }}>🤖</span>
           <h2 style={{ fontWeight: 700, fontSize: '1.5rem', marginBottom: 16 }}>AI Suggestions</h2>
           <p style={{ marginBottom: 24, textAlign: 'center' }}>Get smart recommendations for destinations, activities, and routes based on your interests and travel history.</p>
-          <button style={{ background: '#fff', color: '#ff715b', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(255,113,91,0.10)', transition: 'background 0.2s, color 0.2s' }}>Get AI Suggestions</button>
+          <button style={{ background: '#fff', color: '#ff715b', border: 'none', borderRadius: 999, padding: '12px 36px', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(255,113,91,0.10)', transition: 'background 0.2s, color 0.2s' }} onClick={() => navigate('/ai-trip-planner')}>
+            Get AI Suggestions
+          </button>
         </div>
         {/* Personalized Travel Ideas Card */}
         <div style={{ flex: '1 1 300px', background: 'linear-gradient(135deg, #4CA1AF 0%, #2C3E50 100%)', borderRadius: 24, boxShadow: '0 4px 24px rgba(44,161,175,0.10)', padding: 36, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 280 }}>
@@ -3139,6 +3142,8 @@ function App() {
           <Route path="/trips/:tripId" element={<TripItineraryPage />} />
           <Route path="/my-trips" element={<MyTripsPage />} />
           <Route path="/trip/:id" element={<TripDetailsPage />} />
+          <Route path="/ai-trip-planner" element={<AITripPlanner />} />
+          <Route path="/ai-trip-planner/:tripId" element={<AITripPlanner />} />
         </Routes>
       </Router>
     </AuthProvider>
