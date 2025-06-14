@@ -1473,7 +1473,7 @@ function TripItineraryPage() {
                 <Paper key={section} sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, maxWidth: 500, minWidth: 220, overflowX: 'auto' }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 1 }}>
                     {section === 'places' ? 'Places to Visit' :
-                      section.match(/^\d{4}-\d{2}-\d{2}$/) ? `Itinerary for ${dayjs(section).format('dddd, MMMM D')}` : section}
+                      section.match(/^\d{4}-\d{2}-\d{2}$/) ? `Day ${days.findIndex(d => d.format('YYYY-MM-DD') === section) + 1} - ${dayjs(section).format('dddd, MMMM D')}` : section}
                   </Typography>
                   {remarksArr.map((r, idx) => (
                     <Box key={r.id || idx} sx={{ mb: 1.5, pl: 1, borderLeft: '3px solid #47b5ff', wordBreak: 'break-word' }}>
@@ -1924,7 +1924,7 @@ function TripItineraryPage() {
                   </List>
                 </Paper>
               ) : sidebarSelected === 'remarks' ? (
-                <Paper sx={{ width: '100%', maxWidth: 700, borderRadius: 4, boxShadow: 2, bgcolor: '#fff', p: 3, mx: 'auto' }}>
+                <Paper sx={{ width: '100%', maxWidth: 700, borderRadius: 4, boxShadow: 2, bgcolor: '#f7f9fb', p: 3, mx: 'auto' }}>
                   <Typography variant="h5" sx={{ color: '#2563eb', fontWeight: 700, mb: 2 }}>Special Remarks</Typography>
                   {/* Places to Visit Remark */}
                   <Paper sx={{ p: 2.5, mb: 2, borderRadius: 3, boxShadow: 1, bgcolor: '#f7f9fb' }}>
@@ -3105,7 +3105,7 @@ function TeamMembersSidebar({ members, currentUserEmail }) {
     fetchNames();
   }, [members]);
   return (
-    <Box sx={{ width: 220, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', height: 500, p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <Box sx={{ width: 360, minWidth: 360, bgcolor: '#f7f9fb', borderRight: '1.5px solid #e6eaf0', height: '100vh', p: 0, display: 'flex', flexDirection: 'column' }}>
       <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 2, color: '#223a5f', letterSpacing: 0.5 }}>Team Members</Typography>
       {members.map((m, idx) => {
         const color = getUserColor(m);
